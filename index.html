@@ -861,22 +861,22 @@ body::before {
         </div>
       </div>
 
-      <!-- CHART -->
-      <div class="chart-wrap">
+      <!-- TRADINGVIEW CHART -->
+      <div class="chart-wrap mb10">
         <div class="chart-header">
           <div class="chart-title" id="ch-title">NVDA — السعر + التوقع</div>
           <div class="chart-btns">
-            <button class="chart-btn active" onclick="sRange('1W')">1W</button>
-            <button class="chart-btn" onclick="sRange('1M')">1M</button>
-            <button class="chart-btn" onclick="sRange('3M')">3M</button>
+            <button class="chart-btn active" onclick="setTV('1W','1W')">1W</button>
+            <button class="chart-btn" onclick="setTV('1D','1M')">1M</button>
+            <button class="chart-btn" onclick="setTV('1D','3M')">3M</button>
+            <button class="chart-btn" onclick="setTV('1','1D')">يوم</button>
           </div>
         </div>
-        <div class="chart-inner"><canvas id="MC" height="260"></canvas></div>
-        <div class="chart-legend">
+        <div style="padding:12px"><canvas id="MC" height="280"></canvas></div>
+        <div style="padding:8px 14px;border-top:1px solid var(--bd);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>السعر الفعلي</div>
-          <div class="leg"><div class="leg-line" style="background:var(--cyan)"></div>التوقع</div>
-          <div class="leg"><div class="leg-line" style="background:var(--green)"></div>الهدف</div>
-          <div class="leg"><div class="leg-line" style="background:var(--red)"></div>الوقف</div>
+          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>مستوى الهدف</div>
+          <div class="leg"><div class="leg-line" style="background:var(--red)"></div>وقف الخسارة</div>
           <div class="leg"><div class="leg-line" style="background:rgba(0,230,118,.3);width:14px;height:8px;border-radius:2px"></div>منطقة الدخول</div>
         </div>
       </div>
@@ -1182,122 +1182,151 @@ const D = {
     levels:[{n:'هدف',v:'$543',c:'g'},{n:'مقاومة',v:'$535',c:'n'},{n:'دعم',v:'$524',c:'n'},{n:'وقف',v:'$520',c:'r'}]},
 };
 
-// ═══════════════════════ LIVE PRICES ═══════════════════════
+// ═══════════════════════ LIVE PRICES — Polygon via Vercel ═══════════════════════
 const LP = {};
-Object.keys(D).forEach(t => { LP[t] = { p: D[t].base, pre: D[t].base*(1+(Math.random()-.5)*.009), aft: D[t].base*(1+(Math.random()-.5)*.013) }; });
+Object.keys(D).forEach(t => {
+  LP[t] = { p:D[t].base, prev:D[t].base, pre:+(D[t].base*(1+(Math.random()-.5)*.009)).toFixed(2),
+    aft:+(D[t].base*(1+(Math.random()-.5)*.013)).toFixed(2), chgPct:D[t].chg||0, chgAmt:+(D[t].base*((D[t].chg||0)/100)).toFixed(2), vol:0, source:'sim' };
+});
 
-function getSess() {
-  const ny = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  const t = ny.getHours()*60+ny.getMinutes(), d = ny.getDay();
+// ─── جلب الأسعار الحقيقية عبر Vercel API ───
+async function fetchLivePrices() {
+  const tickers = Object.keys(D).join(',');
+  try {
+    const res = await fetch(`/api/prices?tickers=${tickers}`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+
+    if (data.tickers && data.tickers.length > 0) {
+      data.tickers.forEach(snap => {
+        const t = snap.ticker;
+        if (!LP[t]) return;
+        const day  = snap.day   || {};
+        const prev = snap.prevDay || {};
+        const last = snap.lastTrade || {};
+
+        const price    = last.p || day.c || D[t].base;
+        const prevClose= prev.c || D[t].base;
+        const chgAmt   = +(price - prevClose).toFixed(2);
+        const chgPct   = +((chgAmt / prevClose) * 100).toFixed(2);
+
+        LP[t].p       = price;
+        LP[t].prev    = prevClose;
+        LP[t].open    = day.o  || prevClose;
+        LP[t].high    = day.h  || price;
+        LP[t].low     = day.l  || price;
+        LP[t].vol     = day.v  || 0;
+        LP[t].chgAmt  = chgAmt;
+        LP[t].chgPct  = chgPct;
+        LP[t].source  = 'live';
+      });
+      updPriceStatus('🟢 بيانات حقيقية');
+    }
+  } catch(e) {
+    // عند الفشل — استمر بالمحاكاة
+    updPriceStatus('🟠 محاكاة');
+  }
+}
+
+function updPriceStatus(label) {
+  const u = document.getElementById('lup-time');
+  if (u) u.textContent = label + ' — ' + new Date().toLocaleTimeString('ar');
+}
+
+function getSess(){
+  const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const t=ny.getHours()*60+ny.getMinutes(),d=ny.getDay();
   if(d===0||d===6) return {id:'closed',lbl:'🔴 مغلق',cls:'sb-night'};
-  if(t>=240&&t<570)  return {id:'pre',lbl:'🌙 ما قبل الافتتاح',cls:'sb-pre'};
-  if(t>=570&&t<960)  return {id:'open',lbl:'✅ السوق مفتوح',cls:'sb-open'};
+  if(t>=240&&t<570) return {id:'pre',lbl:'🌙 ما قبل الافتتاح',cls:'sb-pre'};
+  if(t>=570&&t<960) return {id:'open',lbl:'✅ السوق مفتوح',cls:'sb-open'};
   if(t>=960&&t<1200) return {id:'after',lbl:'🌆 ما بعد الإغلاق',cls:'sb-after'};
   return {id:'night',lbl:'🌑 التداول الليلي',cls:'sb-night'};
 }
-
-function updSess() {
-  const s = getSess();
-  const b = document.getElementById('sbadge');
-  b.className = 'sess-badge '+s.cls; b.textContent = s.lbl;
-  const ny = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
-  document.getElementById('nyt').textContent = 'NY: '+ny.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
-  const descs = {pre:'سيولة منخفضة — راقب فجوات الافتتاح',open:'أعلى سيولة — أفضل وقت للتنفيذ',after:'نتائج الشركات — تقلبات عالية',night:'أخبار دولية — سيولة منخفضة جداً',closed:'السوق مغلق — وقت التخطيط'};
-  const desc = document.getElementById('sdesc'); if(desc) desc.textContent = descs[s.id]||'';
-  ['pre','open','after','night'].forEach(id => { const c = document.getElementById('sc-'+id); if(c) c.classList.toggle('active-sess', id===s.id); });
+function updSess(){
+  const s=getSess();const b=document.getElementById('sbadge');
+  if(b){b.className='sess-badge '+s.cls;b.textContent=s.lbl;}
+  const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const nyt=document.getElementById('nyt');if(nyt)nyt.textContent='NY: '+ny.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+  const descs={pre:'سيولة منخفضة',open:'أعلى سيولة — أفضل وقت للتنفيذ',after:'نتائج الشركات',night:'أخبار دولية',closed:'السوق مغلق'};
+  const desc=document.getElementById('sdesc');if(desc)desc.textContent=descs[s.id]||'';
+  ['pre','open','after','night'].forEach(id=>{const c=document.getElementById('sc-'+id);if(c)c.classList.toggle('active-sess',id===s.id);});
 }
-
-function simP(t) {
-  const s = D[t]; const sess = getSess().id;
-  const v = sess==='open'?.0014:sess==='pre'||sess==='after'?.0007:.0003;
-  const dr = s.beh==='buy'?.00016:s.beh==='sell'?-.00016:0;
-  LP[t].p = Math.max(LP[t].p*(1+(Math.random()-.5)*v+dr), s.stop*.93);
-  LP[t].pre *= 1+(Math.random()-.5)*.0005;
-  LP[t].aft *= 1+(Math.random()-.5)*.0005;
+function simP(t){
+  const s=D[t],sess=getSess().id;
+  const v=sess==='open'?.0012:sess==='pre'||sess==='after'?.0006:.0002;
+  const dr=s.beh==='buy'?.00012:s.beh==='sell'?-.00012:0;
+  LP[t].p=Math.max(+(LP[t].p*(1+(Math.random()-.5)*v+dr)).toFixed(2),s.stop*.93);
+  LP[t].chgPct=+((LP[t].p-LP[t].prev)/LP[t].prev*100).toFixed(2);
+  LP[t].chgAmt=+(LP[t].p-LP[t].prev).toFixed(2);
+  LP[t].pre=+(LP[t].pre*(1+(Math.random()-.5)*.0004)).toFixed(2);
+  LP[t].aft=+(LP[t].aft*(1+(Math.random()-.5)*.0004)).toFixed(2);
 }
-
-function buildLPGrid() {
-  const el = document.getElementById('lp-grid'); if(!el) return;
-  const sess = getSess();
-  el.innerHTML = Object.keys(D).map(t => {
-    const s = D[t]; const lp = LP[t];
-    const ch = (lp.p-s.base)/s.base*100;
-    const cc = ch>=0?'var(--green)':'var(--red)';
-    const ext = sess.id==='pre'?lp.pre:lp.aft;
-    const ech = (ext-s.base)/s.base*100;
-    const el2 = sess.id==='pre'?'ما قبل':sess.id==='after'?'بعد إغلاق':sess.id==='night'?'ليلي':'—';
+function buildLPGrid(){
+  const el=document.getElementById('lp-grid');if(!el)return;const sess=getSess();
+  el.innerHTML=Object.keys(D).map(t=>{
+    const s=D[t],lp=LP[t],pct=lp.chgPct||0;
+    const cc=pct>=0?'var(--green)':'var(--red)';
+    const ext=sess.id==='pre'?lp.pre:lp.aft;
+    const extPct=+((ext-lp.prev)/lp.prev*100).toFixed(2);
+    const extL=sess.id==='pre'?'Pre':sess.id==='after'?'After':sess.id==='night'?'Night':'—';
     return `<div class="lpc" id="lpc-${t}">
-      <div class="lpc-name"><span>${t}</span><span style="font-size:7px;color:${sess.id==='open'?'var(--green)':sess.id==='pre'?'var(--purple)':'var(--orange)'}">${sess.id==='open'?'●':sess.id==='pre'?'◐':'◑'}</span></div>
+      <div class="lpc-name"><span>${t}</span><span style="font-size:7px;color:${sess.id==='open'?'var(--green)':'var(--orange)'}">●</span></div>
       <div class="lpc-price" style="color:${cc}" id="lpp-${t}">$${lp.p.toFixed(2)}</div>
-      <div class="lpc-chg" style="color:${cc}">${ch>=0?'+':''}${ch.toFixed(2)}%</div>
-      ${sess.id!=='open'?`<div class="lpc-ext">${el2}: <span style="color:${ech>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)} (${ech>=0?'+':''}${ech.toFixed(2)}%)</span></div>`:''}
-      <div class="lpc-beh"><div class="beh ${s.beh}" style="font-size:9px">${s.bl}</div></div>
-    </div>`;
+      <div class="lpc-chg" style="color:${cc}">${pct>=0?'+':''}${pct}%</div>
+      ${sess.id!=='open'?`<div class="lpc-ext">${extL}: <span style="color:${extPct>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)} (${extPct>=0?'+':''}${extPct}%)</span></div>`:''}
+      <div class="lpc-beh"><div class="beh ${s.beh}" style="font-size:9px">${s.bl}</div></div></div>`;
   }).join('');
 }
-
-function buildPTable() {
-  const el = document.getElementById('ptbody'); if(!el) return;
-  const sess = getSess();
-  el.innerHTML = Object.entries(D).map(([t,s]) => {
-    const lp = LP[t];
-    const ch = (lp.p-s.base)/s.base*100;
-    const ext = sess.id==='pre'?lp.pre:lp.aft;
-    const ech = (ext-s.base)/s.base*100;
-    const sc = s.mom.score;
-    const mc = sc>65?'var(--green)':sc>40?'var(--orange)':'var(--red)';
+function buildPTable(){
+  const el=document.getElementById('ptbody');if(!el)return;const sess=getSess();
+  el.innerHTML=Object.entries(D).map(([t,s])=>{
+    const lp=LP[t],pct=lp.chgPct||0;
+    const ext=sess.id==='pre'?lp.pre:lp.aft;
+    const extPct=+((ext-lp.prev)/lp.prev*100).toFixed(2);
+    const sc=s.mom.score,mc=sc>65?'var(--green)':sc>40?'var(--orange)':'var(--red)';
     return `<tr>
       <td><span class="tk">${t}</span><div style="font-size:7px;color:var(--tx3)">${s.n}</div></td>
       <td><div class="beh ${sess.id==='open'?'buy':'watch'}" style="font-size:8px">${sess.id==='open'?'✅':sess.id==='pre'?'🌙':sess.id==='after'?'🌆':'🌑'}</div></td>
-      <td><div class="pn ${ch>=0?'g':'r'}" id="tp-${t}">$${lp.p.toFixed(2)}</div><div style="font-size:7px;color:${ch>=0?'var(--green)':'var(--red)'}">${ch>=0?'+':''}${ch.toFixed(2)}%</div></td>
-      <td class="pn ${ch>=0?'g':'r'}">${ch>=0?'+':''}${ch.toFixed(2)}%</td>
-      <td style="font-size:9px;color:${ech>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)}<div style="font-size:7px;color:var(--tx3)">${ech>=0?'+':''}${ech.toFixed(2)}%</div></td>
+      <td><div class="pn ${pct>=0?'g':'r'}" id="tp-${t}">$${lp.p.toFixed(2)}</div><div style="font-size:7px;color:${pct>=0?'var(--green)':'var(--red)'}">${pct>=0?'+':''}${pct}%</div></td>
+      <td class="pn ${pct>=0?'g':'r'}">${pct>=0?'+':''}${pct}%</td>
+      <td>${sess.id!=='open'?`<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${extPct>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)} (${extPct>=0?'+':''}${extPct}%)</div>`:'—'}</td>
       <td><div style="font-weight:700;font-size:9px;color:${mc}">${sc}%</div><div style="height:3px;background:var(--bd);border-radius:2px;margin-top:2px;width:48px"><div style="height:100%;width:${sc}%;background:${mc};border-radius:2px"></div></div></td>
       <td><div class="beh ${s.beh}">${s.bl}</div></td>
       <td style="font-size:8px;color:var(--tx3)">${s.wy}</td>
-      <td class="pn g">$${s.target}</td>
-      <td class="pn r">$${s.stop}</td>
-    </tr>`;
+      <td class="pn g">$${s.target}</td><td class="pn r">$${s.stop}</td></tr>`;
   }).join('');
-  const u = document.getElementById('lup-time'); if(u) u.textContent = 'تحديث: '+new Date().toLocaleTimeString('ar');
+  const u=document.getElementById('lup-time');if(u)u.textContent='🟠 محاكاة — '+new Date().toLocaleTimeString('ar');
+}
+async function refreshPrices(){
+  updPriceStatus('⏳ جارٍ التحديث...');
+  await fetchLivePrices();
+  if(LP[Object.keys(D)[0]].source!=='live') Object.keys(D).forEach(t=>simP(t));
+  buildLPGrid(); buildPTable();
 }
 
-function refreshPrices() { Object.keys(D).forEach(t=>simP(t)); buildLPGrid(); buildPTable(); }
-
-// ═══════════════════════ CHART ═══════════════════════
-let CI=null, CT='NVDA', CR='1W';
-
+// ═══════════════════════ CHART.JS ═══════════════════════
+let CI=null,CT='NVDA',CR='1W';
 function genH(base,pts,beh,v){
   const d=[];let p=base*.88;const tr=beh==='buy'?1:beh==='sell'?-1:.2;
-  for(let i=0;i<pts;i++){p+=(Math.random()-.47)*v;p+=tr*base*.0009;if(i>pts*.65)p+=tr*base*.0013;d.push(+p.toFixed(2));}
-  return d;
+  for(let i=0;i<pts;i++){p+=(Math.random()-.47)*v;p+=tr*base*.0009;if(i>pts*.65)p+=tr*base*.0013;d.push(+p.toFixed(2));}return d;
 }
 function genF(last,tgt,stp,pts,beh){
   const d=[];const g=(beh==='sell'?stp:tgt)-last;
-  for(let i=0;i<pts;i++){const t=(i+1)/pts;d.push(+(last+g*Math.pow(t,.65)+(Math.random()-.5)*Math.abs(g)*.13).toFixed(2));}
-  return d;
+  for(let i=0;i<pts;i++){const t=(i+1)/pts;d.push(+(last+g*Math.pow(t,.65)+(Math.random()-.5)*Math.abs(g)*.13).toFixed(2));}return d;
 }
 function genL(r){
-  const now=new Date();
-  const cfg={'1W':{c:38,s:4*3600000,f:d=>`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`},'1M':{c:30,s:86400000,f:d=>`${d.getMonth()+1}/${d.getDate()}`},'3M':{c:45,s:172800000,f:d=>`${d.getMonth()+1}/${d.getDate()}`}};
-  const c=cfg[r]||cfg['1W'];
-  return Array.from({length:c.c+1},(_,i)=>c.f(new Date(now-(c.c-i)*c.s)));
+  const now=new Date();const cfg={'1W':{c:38,s:4*3600000,f:d=>`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`},'1M':{c:30,s:86400000,f:d=>`${d.getMonth()+1}/${d.getDate()}`},'3M':{c:45,s:172800000,f:d=>`${d.getMonth()+1}/${d.getDate()}`}};
+  const c=cfg[r]||cfg['1W'];return Array.from({length:c.c+1},(_,i)=>c.f(new Date(now-(c.c-i)*c.s)));
 }
-
 function buildChart(t,r){
   const s=D[t];const pts=r==='1W'?39:r==='1M'?31:46;const pp=Math.round(pts*.72);const fp=pts-pp;
-  const hist=genH(s.base,pp,s.beh,s.base*.004);
-  const fore=genF(hist[hist.length-1],s.target,s.stop,fp,s.beh);
+  const hist=genH(s.base,pp,s.beh,s.base*.004);const fore=genF(hist[hist.length-1],s.target,s.stop,fp,s.beh);
   const eMin=parseFloat(s.entry[0].p.split('–')[0].replace(/[$]/g,''));
   const eMax=parseFloat((s.entry[0].p.split('–')[1]||String(eMin+3)).replace(/[$a-zA-Zءأ-ي ]/g,''))||eMin+3;
-  const act=[...hist,...Array(fp).fill(null)];
-  const far=[...Array(pp-1).fill(null),hist[pp-1],...fore];
-  const tgt=Array(pts).fill(s.beh==='sell'?s.stop:s.target);
-  const stp=Array(pts).fill(s.stop);
+  const act=[...hist,...Array(fp).fill(null)];const far=[...Array(pp-1).fill(null),hist[pp-1],...fore];
+  const tgt=Array(pts).fill(s.beh==='sell'?s.stop:s.target);const stp=Array(pts).fill(s.stop);
   const ezTop=hist.map(p=>p>=eMin&&p<=eMax?eMax:null);
-  const ezBot=hist.map(p=>p>=eMin&&p<=eMax?eMin:null);
-  const ctx=document.getElementById('MC').getContext('2d');
-  if(CI) CI.destroy();
+  const ctx=document.getElementById('MC').getContext('2d');if(CI)CI.destroy();
   CI=new Chart(ctx,{type:'line',data:{labels:genL(r),datasets:[
     {label:'السعر',data:act,borderColor:'#C9A84C',borderWidth:2.2,pointRadius:0,pointHoverRadius:3,tension:.4,fill:false,order:1},
     {label:'التوقع',data:far,borderColor:'#00D4FF',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.4,fill:false,order:2},
@@ -1306,10 +1335,61 @@ function buildChart(t,r){
     {label:'منطقة دخول',data:[...ezTop,...Array(fp).fill(null)],borderColor:'transparent',backgroundColor:'rgba(0,230,118,.07)',fill:{target:{value:eMin},above:'rgba(0,230,118,.09)',below:'transparent'},pointRadius:0,tension:0,order:5},
   ]},options:{responsive:true,maintainAspectRatio:false,
     plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#0F1822',borderColor:'#1C2D40',borderWidth:1,titleColor:'#D8E2EC',bodyColor:'#6B8090',padding:9}},
-    scales:{
-      x:{grid:{color:'rgba(28,45,64,.35)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8},maxTicksLimit:8}},
-      y:{grid:{color:'rgba(28,45,64,.28)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8,family:"'JetBrains Mono'"},callback:v=>`$${v.toFixed(0)}`},position:'right'}
-    },interaction:{mode:'index',intersect:false}}});
+    scales:{x:{grid:{color:'rgba(28,45,64,.35)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8},maxTicksLimit:8}},
+    y:{grid:{color:'rgba(28,45,64,.28)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8,family:"'JetBrains Mono'"},callback:v=>`$${v.toFixed(0)}`},position:'right'}},
+    interaction:{mode:'index',intersect:false}}});
+}
+function sRange(r){CR=r;document.querySelectorAll('.chart-btn').forEach(b=>b.classList.toggle('active',b.textContent===r));buildChart(CT,CR);}
+function setTV(i,r){sRange({'1W':'1W','1M':'1M','3M':'3M','1D':'1W'}[r]||r);}
+
+
+function selStock(t){
+  CT=t; const s=D[t]; const lp=LP[t];
+  document.querySelectorAll('.stab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
+  document.getElementById('pr-name').textContent=`${t} — ${s.n}`;
+  const p=lp.p||s.base, pct=lp.chgPct||0;
+  document.getElementById('pr-price').textContent=`$${p.toFixed(2)}`;
+  const cel=document.getElementById('pr-chg');
+  cel.textContent=(pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';
+  cel.className='pr-chg '+(pct>=0?'up':'dn');
+  document.getElementById('ch-title').textContent=`${t} — السعر + التوقع`;
+  document.getElementById('pr-meta').textContent=`هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
+  const pb=document.getElementById('pr-beh');pb.textContent=s.bl;pb.className='beh '+s.beh;
+  const sess=getSess();const ps=document.getElementById('pr-sess');
+  if(ps){ps.className='sess-badge '+sess.cls;ps.textContent=sess.lbl;}
+  updMom(t);
+  buildChart(t,CR);
+  // توقعات الأسعار
+  const bc={h:'badge-h',m:'badge-m',l:'badge-l'},bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
+  const fcC=s.beh==='sell'?'var(--red)':'var(--green)';
+  document.getElementById('fc-rows').innerHTML=s.forecast.map(f=>`
+    <div class="fc-row"><div class="fc-lbl">${f.l}</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcC}">${f.v}</div>
+      <div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div>
+    </div></div>`).join('');
+  // سيناريوهات
+  document.getElementById('scenarios').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px"><span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px"><span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px"><span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span></div>
+    </div>`;
+  // مناطق الدخول
+  const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
+  const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
+  const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
+  document.getElementById('entry-zones').innerHTML=s.entry.map(e=>`
+    <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
+      <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
+      <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
+      <div class="ez-why">${e.why}</div></div>`).join('');
+  // مستويات
+  const kc={g:'var(--green)',r:'var(--red)',n:'var(--tx2)'};
+  document.getElementById('klevels').innerHTML=s.levels.map(l=>`
+    <div class="klev" style="border-right:3px solid ${kc[l.c]||'var(--tx3)'}">
+      <div class="klev-lbl">${l.n}</div>
+      <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div></div>`).join('');
 }
 
 function updMom(t){
@@ -1334,56 +1414,6 @@ function updMom(t){
   set('m-tot',total>65?'قوي':total>40?'محايد':'ضعيف',tc2);set('m-tot-s',ts,tc2);
   const bar=document.getElementById('m-bar');
   if(bar){bar.style.width=total+'%';bar.style.background=`linear-gradient(90deg,${tc2},${tc2}99)`;}
-}
-
-function selStock(t){
-  CT=t;const s=D[t];const lp=LP[t];
-  document.querySelectorAll('.stab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
-  document.getElementById('pr-name').textContent=`${t} — ${s.n}`;
-  const prEl=document.getElementById('pr-price');prEl.textContent=`$${lp.p.toFixed(2)}`;
-  const ch=(lp.p-s.base)/s.base*100;
-  const cEl=document.getElementById('pr-chg');cEl.textContent=(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%';cEl.className='pr-chg '+(ch>=0?'up':'dn');
-  document.getElementById('ch-title').textContent=`${t} — السعر + التوقع + مناطق الدخول`;
-  document.getElementById('pr-meta').textContent=`هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
-  const pb=document.getElementById('pr-beh');pb.textContent=s.bl;pb.className='beh '+s.beh;
-  const sess=getSess();const ps=document.getElementById('pr-sess');ps.className='sess-badge '+sess.cls;ps.textContent=sess.lbl;
-  updMom(t);
-  // Forecast rows
-  const bc={h:'badge-h',m:'badge-m',l:'badge-l'};const bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
-  const fcColor=s.beh==='sell'?'var(--red)':'var(--green)';
-  document.getElementById('fc-rows').innerHTML=s.forecast.map(f=>`
-    <div class="fc-row"><div class="fc-lbl">${f.l}</div><div style="display:flex;align-items:center;gap:6px"><div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcColor}">${f.v}</div><div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div></div></div>`).join('');
-  // Scenarios
-  document.getElementById('scenarios').innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:5px">
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px"><span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px"><span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px"><span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span></div>
-    </div>`;
-  // Entry zones
-  const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
-  const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
-  const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
-  document.getElementById('entry-zones').innerHTML=s.entry.map(e=>`
-    <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
-      <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
-      <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
-      <div class="ez-why">${e.why}</div>
-    </div>`).join('');
-  // Key levels
-  const kc={g:'var(--green)',r:'var(--red)',n:'var(--tx2)'};
-  document.getElementById('klevels').innerHTML=s.levels.map(l=>`
-    <div class="klev" style="border-right:3px solid ${kc[l.c]||'var(--tx3)'}">
-      <div class="klev-lbl">${l.n}</div>
-      <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div>
-    </div>`).join('');
-  buildChart(t,CR);
-}
-
-function sRange(r){
-  CR=r;
-  document.querySelectorAll('.chart-btn').forEach(b=>b.classList.toggle('active',b.textContent===r));
-  buildChart(CT,CR);
 }
 
 // Build tabs
@@ -1442,7 +1472,7 @@ function goTo(id){
   const items=document.querySelectorAll('.nav-item');
   if(items[idx]) items[idx].classList.add('active');
   document.getElementById('app-content').scrollTop=0;
-  if(id==='charts'&&!CI) setTimeout(()=>selStock('NVDA'),60);
+  if(id==='charts') setTimeout(()=>selStock(CT||'NVDA'),80);
   if(id==='livep'){ buildLPGrid(); buildPTable(); }
 }
 
@@ -1509,16 +1539,33 @@ function tick(){
 }
 setInterval(tick,1000); tick();
 
-// ═══ PRICE SIM ═══
-setInterval(()=>{
-  Object.keys(D).forEach(t=>simP(t));
-  const lp=document.getElementById('sec-livep');
-  if(lp?.classList.contains('active')){buildLPGrid();buildPTable();}
-  if(CI){
-    const p=LP[CT].p;const el=document.getElementById('pr-price');
-    if(el){el.textContent=`$${p.toFixed(2)}`;el.classList.add('pflash');setTimeout(()=>el.classList.remove('pflash'),350);}
-  }
-},4000);
+// ═══ PRICE POLLING ═══
+// جلب أولي فوري
+fetchLivePrices();
+
+// تحديث كل 15 ثانية أثناء التداول — كل دقيقة خارجه
+function startPricePolling() {
+  const sess = getSess().id;
+  const interval = sess==='open' ? 15000 : sess==='pre'||sess==='after' ? 30000 : 60000;
+  setTimeout(async () => {
+    await fetchLivePrices();
+    // إذا فشل الجلب استخدم المحاكاة كـ fallback
+    if (LP[CT].source !== 'live') Object.keys(D).forEach(t=>simP(t));
+
+    const lp=document.getElementById('sec-livep');
+    if(lp?.classList.contains('active')){buildLPGrid();buildPTable();}
+    const ch=document.getElementById('sec-charts');
+    if(ch?.classList.contains('active')&&CI){
+      const p=LP[CT].p,pct=LP[CT].chgPct||0;
+      const el=document.getElementById('pr-price');
+      if(el){el.textContent=`$${p.toFixed(2)}`;el.classList.add('pflash');setTimeout(()=>el.classList.remove('pflash'),350);}
+      const cel=document.getElementById('pr-chg');
+      if(cel){cel.textContent=(pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';cel.className='pr-chg '+(pct>=0?'up':'dn');}
+    }
+    startPricePolling();
+  }, interval);
+}
+startPricePolling();
 
 // ═══ INIT ═══
 pickWy(document.querySelector('.wy-card'),'acc');
