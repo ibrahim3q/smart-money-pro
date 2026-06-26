@@ -1197,33 +1197,33 @@ async function fetchLivePrices() {
     if (!res.ok) throw new Error('API error');
     const data = await res.json();
 
-    if (data.tickers && data.tickers.length > 0) {
-      data.tickers.forEach(snap => {
-        const t = snap.ticker;
+    if (data.prices && data.prices.length > 0) {
+      data.prices.forEach(item => {
+        const t = item.ticker;
         if (!LP[t]) return;
-        const day  = snap.day   || {};
-        const prev = snap.prevDay || {};
-        const last = snap.lastTrade || {};
 
-        const price    = last.p || day.c || D[t].base;
-        const prevClose= prev.c || D[t].base;
-        const chgAmt   = +(price - prevClose).toFixed(2);
-        const chgPct   = +((chgAmt / prevClose) * 100).toFixed(2);
+        const price   = item.close;
+        const prevDay = item.open; // نستخدم open كمرجع للتغيير اليومي
+        const chgAmt  = +(price - prevDay).toFixed(2);
+        const chgPct  = +((chgAmt / prevDay) * 100).toFixed(2);
 
-        LP[t].p       = price;
-        LP[t].prev    = prevClose;
-        LP[t].open    = day.o  || prevClose;
-        LP[t].high    = day.h  || price;
-        LP[t].low     = day.l  || price;
-        LP[t].vol     = day.v  || 0;
-        LP[t].chgAmt  = chgAmt;
-        LP[t].chgPct  = chgPct;
-        LP[t].source  = 'live';
+        LP[t].p      = price;
+        LP[t].prev   = prevDay;
+        LP[t].open   = item.open;
+        LP[t].high   = item.high;
+        LP[t].low    = item.low;
+        LP[t].vol    = item.volume;
+        LP[t].chgAmt = chgAmt;
+        LP[t].chgPct = chgPct;
+        LP[t].source = 'live';
+        LP[t].date   = item.date;
+
+        // تحديث base للرسم البياني بالسعر الحقيقي
+        D[t].base = price;
       });
-      updPriceStatus('🟢 بيانات حقيقية');
+      updPriceStatus(`🟢 إغلاق ${data.date}`);
     }
   } catch(e) {
-    // عند الفشل — استمر بالمحاكاة
     updPriceStatus('🟠 محاكاة');
   }
 }
