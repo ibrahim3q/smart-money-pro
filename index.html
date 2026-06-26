@@ -1405,36 +1405,61 @@ async function fetchIndicators(ticker) {
 async function fetchMarketData() {
   try {
     const res  = await fetch('/api/prices?type=market');
+    if(!res.ok) throw new Error('market API error');
     const data = await res.json();
-    if (data.fearGreed) {
-      const fg    = Math.round(data.fearGreed);
+
+    // VIX
+    if(data.vix) {
+      const v = +data.vix.toFixed(1);
+      const vixEl  = document.getElementById('dash-vix');
+      const vixLbl = document.getElementById('dash-vix-lbl');
+      const hVix   = document.querySelector('.mkp-v.neu');
+      if(vixEl)  vixEl.textContent  = v;
+      if(hVix)   hVix.textContent   = v;
+      if(vixLbl) {
+        vixLbl.textContent = v>30?'⚠️ خوف شديد':v>20?'⚠️ خوف':v>15?'متوسط':'🟢 هادئ';
+        vixLbl.className   = 'stat-ch '+(v>20?'dn':v>15?'w':'up');
+      }
+    }
+
+    // Fear & Greed
+    const fg = data.fearGreed ? Math.round(data.fearGreed) : null;
+    if(fg) {
       const label = fg>=75?'جشع شديد':fg>=55?'جشع':fg>=45?'محايد':fg>=25?'خوف':'خوف شديد';
       const color = fg>=75?'var(--red)':fg>=55?'var(--orange)':fg>=45?'var(--tx2)':fg>=25?'var(--cyan)':'var(--green)';
-      // تحديث المقياس
+      const sub   = fg>=55?'تحذير: خطر تصحيح قريب':fg<=45?'فرصة شراء محتملة':'السوق متوازن';
       const numEl = document.getElementById('fg-num');
       const lblEl = document.getElementById('fg-lbl');
       const subEl = document.getElementById('fg-sub');
       const nowEl = document.getElementById('fg-now');
       if(numEl){ numEl.textContent=fg; numEl.style.color=color; }
       if(lblEl){ lblEl.textContent=label; lblEl.style.color=color; }
-      if(subEl) subEl.textContent = fg>=55?'تحذير: خطر تصحيح قريب':fg<=45?'فرصة شراء محتملة':'السوق متوازن';
-      if(nowEl) nowEl.textContent = fg;
-      // تحريك مؤشر المقياس
+      if(subEl) subEl.textContent=sub;
+      if(nowEl) nowEl.textContent=fg;
+      // تحريك المؤشر
       const needle = document.getElementById('fg-needle');
       if(needle) {
-        const angle = (fg/100)*180 - 90;
-        const rad   = (angle * Math.PI) / 180;
-        const x2    = 90 + 70*Math.cos(rad);
-        const y2    = 80 + 70*Math.sin(rad);
-        needle.setAttribute('x2', x2.toFixed(1));
-        needle.setAttribute('y2', y2.toFixed(1));
+        const angle = (fg/100)*180-90;
+        const rad   = angle*Math.PI/180;
+        needle.setAttribute('x2', (90+70*Math.cos(rad)).toFixed(1));
+        needle.setAttribute('y2', (80+70*Math.sin(rad)).toFixed(1));
       }
+    } else {
+      // قيم افتراضية إذا فشل الجلب
+      const numEl=document.getElementById('fg-num');
+      const lblEl=document.getElementById('fg-lbl');
+      const subEl=document.getElementById('fg-sub');
+      if(numEl){ numEl.textContent='N/A'; numEl.style.color='var(--tx3)'; }
+      if(lblEl){ lblEl.textContent='غير متاح'; lblEl.style.color='var(--tx3)'; }
+      if(subEl) subEl.textContent='بيانات CNN غير متاحة حالياً';
     }
-    if (data.vix) {
-      const vixEl = document.querySelector('.mkp-v.neu');
-      if(vixEl) vixEl.textContent = data.vix.toFixed(1);
-    }
-  } catch(e) {}
+  } catch(e) {
+    // قيم افتراضية عند الخطأ
+    const numEl=document.getElementById('fg-num');
+    const lblEl=document.getElementById('fg-lbl');
+    if(numEl){ numEl.textContent='—'; numEl.style.color='var(--tx3)'; }
+    if(lblEl){ lblEl.textContent='خطأ في الاتصال'; lblEl.style.color='var(--tx3)'; }
+  }
 }
 
 // ─── تحديث لوحة الزخم بمؤشرات حقيقية ───
@@ -2070,42 +2095,25 @@ startPricePolling();
 pickWy(document.querySelector('.wy-card'),'acc');
 buildSig(); buildMP(); updSess();
 
-// جلب بيانات السوق الحقيقية عند التحميل
-(async () => {
-  // ١. أسعار لحظية
-  await fetchLivePrices();
+// جلب البيانات الحقيقية — بشكل آمن لا يوقف الصفحة
+setTimeout(async () => {
+  try {
+    // أسعار لحظية
+    await fetchLivePrices();
+    buildLPGrid();
+    buildPTable();
+    buildSig();
+    buildMP();
+    refreshAllUI();
+  } catch(e) { console.warn('Price fetch error:', e); }
 
-  // ٢. Fear & Greed + VIX
-  await fetchMarketData();
-
-  // ٣. تحديث VIX وPut/Call في الهيدر
-  const vixEl   = document.getElementById('dash-vix');
-  const vixLbl  = document.getElementById('dash-vix-lbl');
-  const pcEl    = document.getElementById('dash-pc');
-  const pcLbl   = document.getElementById('dash-pc-lbl');
-
-  // جلب VIX الحقيقي من VIXY
-  const vixP = LP['VIXY']?.p;
-  if(vixP && vixEl) {
-    vixEl.textContent = vixP.toFixed(1);
-    if(vixLbl) {
-      const v = vixP;
-      vixLbl.textContent = v>30?'⚠️ خوف شديد':v>20?'⚠️ خوف':v>15?'متوسط':'🟢 هادئ';
-      vixLbl.className   = 'stat-ch '+(v>20?'dn':v>15?'w':'up');
-    }
-    // تحديث الهيدر
-    const hVix = document.querySelector('.mkp-v.neu');
-    if(hVix) hVix.textContent = vixP.toFixed(1);
-  }
-
-  // تحديث الواجهة
-  buildLPGrid();
-  buildPTable();
-  buildSig();
-  buildMP();
-  refreshAllUI();
-})();
+  try {
+    // بيانات السوق (VIX + Fear&Greed)
+    await fetchMarketData();
+  } catch(e) { console.warn('Market data error:', e); }
+}, 500);
 </script>
 </body>
 </html>
+
 
