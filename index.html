@@ -1180,16 +1180,56 @@ const D = {
     entry:[{z:'⭐ الأمثل',p:'$522–$526',why:'دعم Markup + تدفق مؤسسي إيجابي'},{z:'🛡️ محافظ',p:'$526–$532',why:'فوق الدعم المحلي'}],
     forecast:[{l:'الأسبوع',v:'$535',c:'h'},{l:'الشهر',v:'$540',c:'m'},{l:'3 أشهر',v:'$548',c:'m'},{l:'سيناريو صعودي',v:'$558',c:'m'},{l:'سيناريو هبوطي',v:'$514',c:'m'}],
     levels:[{n:'هدف',v:'$543',c:'g'},{n:'مقاومة',v:'$535',c:'n'},{n:'دعم',v:'$524',c:'n'},{n:'وقف',v:'$520',c:'r'}]},
+  AMZN:{n:'Amazon',base:228.50,chg:1.4,beh:'buy',bl:'🟢 تراكم مؤسسي',rr:'2.8:1',wy:'Markup',pool:'69%',vol:'6.8x',target:252,stop:218,h:'3 أسابيع',
+    mom:{rsi:57.2,macd:2.44,sto:64.8,adx:30.1,bb:'وسط-أعلى',ema:'صاعد',score:72},
+    entry:[{z:'⭐ الأمثل',p:'$219–$224',why:'دعم EMA20 + Vanguard تتراكم'},{z:'🛡️ محافظ',p:'$224–$229',why:'فوق الدعم بهامش أمان'}],
+    forecast:[{l:'الأسبوع',v:'$234',c:'h'},{l:'الشهر',v:'$242',c:'h'},{l:'3 أشهر',v:'$255',c:'m'},{l:'سيناريو صعودي',v:'$268',c:'m'},{l:'سيناريو هبوطي',v:'$212',c:'m'}],
+    levels:[{n:'هدف ١',v:'$242',c:'g'},{n:'هدف ٢',v:'$252',c:'g'},{n:'دعم',v:'$222',c:'n'},{n:'وقف',v:'$218',c:'r'}]},
+  SMCI:{n:'Super Micro',base:48.20,chg:3.8,beh:'buy',bl:'🟢 نشاط AI مرتفع',rr:'3.1:1',wy:'Markup',pool:'72%',vol:'11.2x',target:58,stop:44,h:'2 أسابيع',
+    mom:{rsi:64.4,macd:3.22,sto:74.6,adx:36.8,bb:'أعلى',ema:'صاعد',score:80},
+    entry:[{z:'⭐ الأمثل',p:'$44–$46',why:'دعم قوي + حجم AI غير طبيعي'},{z:'🛡️ محافظ',p:'$46–$49',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$52',c:'h'},{l:'الشهر',v:'$56',c:'h'},{l:'3 أشهر',v:'$64',c:'m'},{l:'سيناريو صعودي',v:'$72',c:'m'},{l:'سيناريو هبوطي',v:'$42',c:'m'}],
+    levels:[{n:'هدف ١',v:'$54',c:'g'},{n:'هدف ٢',v:'$58',c:'g'},{n:'دعم',v:'$45',c:'n'},{n:'وقف',v:'$44',c:'r'}]},
+  PLTR:{n:'Palantir',base:142.30,chg:2.2,beh:'buy',bl:'🟢 تدفق مؤسسي',rr:'2.7:1',wy:'Markup',pool:'67%',vol:'8.4x',target:162,stop:132,h:'3 أسابيع',
+    mom:{rsi:61.4,macd:3.88,sto:71.2,adx:34.4,bb:'أعلى-وسط',ema:'صاعد',score:76},
+    entry:[{z:'⭐ الأمثل',p:'$132–$137',why:'دعم + Cathie Wood تشتري'},{z:'🛡️ محافظ',p:'$137–$143',why:'فوق مستوى الدعم'}],
+    forecast:[{l:'الأسبوع',v:'$148',c:'h'},{l:'الشهر',v:'$155',c:'h'},{l:'3 أشهر',v:'$168',c:'m'},{l:'سيناريو صعودي',v:'$180',c:'m'},{l:'سيناريو هبوطي',v:'$128',c:'m'}],
+    levels:[{n:'هدف ١',v:'$155',c:'g'},{n:'هدف ٢',v:'$162',c:'g'},{n:'دعم',v:'$135',c:'n'},{n:'وقف',v:'$132',c:'r'}]},
+  MSTR:{n:'MicroStrategy',base:388.40,chg:4.2,beh:'buy',bl:'🟢 مرتبط BTC',rr:'2.5:1',wy:'Markup',pool:'64%',vol:'9.6x',target:445,stop:358,h:'4 أسابيع',
+    mom:{rsi:62.8,macd:8.44,sto:68.8,adx:32.2,bb:'أعلى',ema:'صاعد',score:74},
+    entry:[{z:'⭐ الأمثل',p:'$358–$372',why:'ارتداد مع BTC + تراكم مؤسسي'},{z:'🛡️ محافظ',p:'$372–$390',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$408',c:'h'},{l:'الشهر',v:'$425',c:'m'},{l:'3 أشهر',v:'$445',c:'m'},{l:'سيناريو صعودي',v:'$520',c:'l'},{l:'سيناريو هبوطي',v:'$320',c:'m'}],
+    levels:[{n:'هدف ١',v:'$420',c:'g'},{n:'هدف ٢',v:'$445',c:'g'},{n:'دعم',v:'$365',c:'n'},{n:'وقف',v:'$358',c:'r'}]},
+  SQQQ:{n:'Inverse NASDAQ 3x',base:8.40,chg:-1.8,beh:'watch',bl:'👁 تحوط — حذر',rr:'2.0:1',wy:'Markdown',pool:'45%',vol:'12.4x',target:10.5,stop:7.8,h:'1 أسبوع',
+    mom:{rsi:38.4,macd:-0.44,sto:32.4,adx:28.8,bb:'أسفل',ema:'هابط',score:32},
+    entry:[{z:'⚠️ تحوط فقط',p:'$8.2–$8.6',why:'للتحوط عند خوف السوق VIX > 25'},{z:'🔴 بيع السوق',p:'عند انهيار QQQ',why:'SQQQ يصعد عكس NASDAQ'}],
+    forecast:[{l:'إذا هبط QQQ 5%',v:'$9.8',c:'m'},{l:'إذا هبط QQQ 10%',v:'$11.2',c:'m'},{l:'إذا صعد QQQ',v:'$7.2',c:'h'},{l:'سيناريو هبوط سوق',v:'$12.0',c:'l'},{l:'سيناريو صعود سوق',v:'$6.5',c:'m'}],
+    levels:[{n:'هدف تحوط',v:'$10.5',c:'g'},{n:'مقاومة',v:'$9.8',c:'n'},{n:'دعم',v:'$8.0',c:'n'},{n:'وقف',v:'$7.8',c:'r'}]},
+  IBIT:{n:'BlackRock Bitcoin ETF',base:58.20,chg:3.4,beh:'buy',bl:'🟢 تراكم مؤسسي ضخم',rr:'2.9:1',wy:'Markup',pool:'76%',vol:'10.8x',target:68,stop:54,h:'3 أسابيع',
+    mom:{rsi:65.2,macd:2.88,sto:72.4,adx:38.4,bb:'أعلى',ema:'صاعد',score:82},
+    entry:[{z:'⭐ الأمثل',p:'$54–$57',why:'BlackRock تتراكم + BTC فوق $65K'},{z:'🛡️ محافظ',p:'$57–$59',why:'فوق دعم EMA20'}],
+    forecast:[{l:'الأسبوع',v:'$62',c:'h'},{l:'الشهر',v:'$65',c:'h'},{l:'3 أشهر',v:'$72',c:'m'},{l:'سيناريو صعودي',v:'$85',c:'m'},{l:'سيناريو هبوطي',v:'$50',c:'m'}],
+    levels:[{n:'هدف ١',v:'$64',c:'g'},{n:'هدف ٢',v:'$68',c:'g'},{n:'دعم',v:'$56',c:'n'},{n:'وقف',v:'$54',c:'r'}]},
+  ARM:{n:'ARM Holdings',base:168.40,chg:2.8,beh:'buy',bl:'🟢 قطاع AI',rr:'2.6:1',wy:'Markup',pool:'65%',vol:'7.2x',target:192,stop:156,h:'4 أسابيع',
+    mom:{rsi:59.8,macd:3.44,sto:66.4,adx:31.8,bb:'وسط-أعلى',ema:'صاعد',score:70},
+    entry:[{z:'⭐ الأمثل',p:'$156–$161',why:'دعم + نمو AI chips مستمر'},{z:'🛡️ محافظ',p:'$161–$169',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$174',c:'h'},{l:'الشهر',v:'$182',c:'h'},{l:'3 أشهر',v:'$195',c:'m'},{l:'سيناريو صعودي',v:'$215',c:'m'},{l:'سيناريو هبوطي',v:'$148',c:'m'}],
+    levels:[{n:'هدف ١',v:'$182',c:'g'},{n:'هدف ٢',v:'$192',c:'g'},{n:'دعم',v:'$160',c:'n'},{n:'وقف',v:'$156',c:'r'}]},
+  MRVL:{n:'Marvell Tech',base:118.60,chg:1.6,beh:'buy',bl:'🟢 شرائح AI',rr:'2.4:1',wy:'Late Acc',pool:'62%',vol:'6.4x',target:136,stop:110,h:'4 أسابيع',
+    mom:{rsi:55.4,macd:2.12,sto:60.8,adx:27.6,bb:'وسط',ema:'صاعد',score:64},
+    entry:[{z:'⭐ الأمثل',p:'$110–$114',why:'دعم + طلب شرائح AI متزايد'},{z:'🛡️ محافظ',p:'$114–$119',why:'فوق الدعم بهامش'}],
+    forecast:[{l:'الأسبوع',v:'$122',c:'h'},{l:'الشهر',v:'$128',c:'m'},{l:'3 أشهر',v:'$138',c:'m'},{l:'سيناريو صعودي',v:'$152',c:'m'},{l:'سيناريو هبوطي',v:'$105',c:'m'}],
+    levels:[{n:'هدف ١',v:'$128',c:'g'},{n:'هدف ٢',v:'$136',c:'g'},{n:'دعم',v:'$112',c:'n'},{n:'وقف',v:'$110',c:'r'}]},
 };
 
-// ═══════════════════════ LIVE PRICES — Polygon via Vercel ═══════════════════════
+// ═══════════════════════ LIVE PRICES — Polygon Snapshot ═══════════════════════
 const LP = {};
 Object.keys(D).forEach(t => {
   LP[t] = { p:D[t].base, prev:D[t].base, pre:+(D[t].base*(1+(Math.random()-.5)*.009)).toFixed(2),
     aft:+(D[t].base*(1+(Math.random()-.5)*.013)).toFixed(2), chgPct:D[t].chg||0, chgAmt:+(D[t].base*((D[t].chg||0)/100)).toFixed(2), vol:0, source:'sim' };
 });
 
-// ─── جلب الأسعار الحقيقية عبر Vercel API ───
+// ─── جلب الأسعار الحقيقية — Snapshot API (خطة مدفوعة) ───
 async function fetchLivePrices() {
   const tickers = Object.keys(D).join(',');
   try {
@@ -1197,33 +1237,56 @@ async function fetchLivePrices() {
     if (!res.ok) throw new Error('API error');
     const data = await res.json();
 
+    // Snapshot API response
+    if (data.tickers && data.tickers.length > 0) {
+      data.tickers.forEach(snap => {
+        const t = snap.ticker;
+        if (!LP[t]) return;
+        const day   = snap.day      || {};
+        const prev  = snap.prevDay  || {};
+        const last  = snap.lastTrade|| {};
+        const quote = snap.lastQuote|| {};
+
+        const price    = last.p || day.c || D[t].base;
+        const prevClose= prev.c || D[t].base;
+        const chgAmt   = +(price - prevClose).toFixed(2);
+        const chgPct   = +((chgAmt / prevClose) * 100).toFixed(2);
+
+        LP[t].p      = price;
+        LP[t].prev   = prevClose;
+        LP[t].open   = day.o  || prevClose;
+        LP[t].high   = day.h  || price;
+        LP[t].low    = day.l  || price;
+        LP[t].vol    = day.v  || 0;
+        LP[t].pre    = snap.min?.o || LP[t].pre;
+        LP[t].aft    = snap.min?.c || LP[t].aft;
+        LP[t].chgAmt = chgAmt;
+        LP[t].chgPct = chgPct;
+        LP[t].source = 'live';
+        D[t].base    = price; // تحديث الرسم البياني
+      });
+      updPriceStatus(`🟢 لحظي — ${data.tickers.length} سهم`);
+      return;
+    }
+
+    // Prev Close API response (fallback)
     if (data.prices && data.prices.length > 0) {
       data.prices.forEach(item => {
         const t = item.ticker;
         if (!LP[t]) return;
-
-        const price   = item.close;
-        const prevDay = item.open; // نستخدم open كمرجع للتغيير اليومي
-        const chgAmt  = +(price - prevDay).toFixed(2);
-        const chgPct  = +((chgAmt / prevDay) * 100).toFixed(2);
-
-        LP[t].p      = price;
-        LP[t].prev   = prevDay;
-        LP[t].open   = item.open;
-        LP[t].high   = item.high;
-        LP[t].low    = item.low;
-        LP[t].vol    = item.volume;
-        LP[t].chgAmt = chgAmt;
-        LP[t].chgPct = chgPct;
-        LP[t].source = 'live';
-        LP[t].date   = item.date;
-
-        // تحديث base للرسم البياني بالسعر الحقيقي
-        D[t].base = price;
+        const price  = item.close;
+        const chgAmt = +(price - item.open).toFixed(2);
+        const chgPct = +((chgAmt / item.open) * 100).toFixed(2);
+        LP[t].p = price; LP[t].prev = item.open;
+        LP[t].open = item.open; LP[t].high = item.high;
+        LP[t].low = item.low; LP[t].vol = item.volume;
+        LP[t].chgAmt = chgAmt; LP[t].chgPct = chgPct;
+        LP[t].source = 'live'; D[t].base = price;
       });
-      updPriceStatus(`🟢 إغلاق ${data.date}`);
+      updPriceStatus(`🟡 إغلاق ${data.date} — ${data.prices.length} سهم`);
     }
   } catch(e) {
+    Object.keys(D).forEach(t => simP(t));
     updPriceStatus('🟠 محاكاة');
   }
 }
@@ -1573,3 +1636,4 @@ buildSig(); buildMP(); updSess();
 </script>
 </body>
 </html>
+
