@@ -6,48 +6,40 @@ export default async function handler(req, res) {
   if (!tickers) return res.status(400).json({ error: 'tickers required' });
 
   const API_KEY = 'yoTGVzu_bIApT5a0NZyAXN81zi3AUwm2';
-  const tickerList = tickers.split(',');
+  const tickerList = tickers.split(',').map(t => t.trim());
+  const yesterday = getPrevTradingDay();
 
-  try {
-    // جلب إغلاق أمس لكل سهم — يعمل مع الخطة المجانية
-    const yesterday = getPrevTradingDay();
-
-    const results = await Promise.allSettled(
-      tickerList.map(async t => {
-        const url = `https://api.polygon.io/v1/open-close/${t.trim()}/${yesterday}?adjusted=true&apiKey=${API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        return { ticker: t.trim(), data };
-      })
-    );
-
-    const prices = results
-      .filter(r => r.status === 'fulfilled' && r.value.data.close)
-      .map(r => ({
-        ticker:  r.value.ticker,
-        close:   r.value.data.close,
-        open:    r.value.data.open,
-        high:    r.value.data.high,
-        low:     r.value.data.low,
-        volume:  r.value.data.volume,
-        date:    r.value.data.from,
-      }));
-
-    res.status(200).json({ prices, source: 'prev_close', date: yesterday });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  // جلب بالتسلسل لتجنب حد الطلبات
+  const prices = [];
+  for (const t of tickerList) {
+    try {
+      await sleep(300); // انتظار 300ms بين كل طلب
+      const url = `https://api.polygon.io/v1/open-close/${t}/${yesterday}?adjusted=true&apiKey=${API_KEY}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      if (data.close) {
+        prices.push({
+          ticker: t,
+          close:  data.close,
+          open:   data.open,
+          high:   data.high,
+          low:    data.low,
+          volume: data.volume,
+          date:   data.from,
+        });
+      }
+    } catch(e) { /* تجاهل وتابع */ }
   }
+
+  res.status(200).json({ prices, source: 'prev_close', date: yesterday });
 }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function getPrevTradingDay() {
   const d = new Date();
-  // تحويل لتوقيت نيويورك
   const ny = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   ny.setDate(ny.getDate() - 1);
-  // تخطي عطل نهاية الأسبوع
-  while (ny.getDay() === 0 || ny.getDay() === 6) {
-    ny.setDate(ny.getDate() - 1);
-  }
+  while (ny.getDay() === 0 || ny.getDay() === 6) ny.setDate(ny.getDate() - 1);
   return ny.toISOString().slice(0, 10);
 }
