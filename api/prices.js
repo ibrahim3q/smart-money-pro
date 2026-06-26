@@ -60,30 +60,43 @@ export default async function handler(req, res) {
       return res.json({ type:'indicators', ticker:t, rsi, macd, ema20, ema20prev, sma50 });
     }
 
-    // ── ٤. Fear & Greed + VIX + Put/Call ────────────────────
+    // ── ٤. Fear & Greed + VIX ────────────────────
     if (type === 'market') {
-      const [vixR, pcR, fgR] = await Promise.allSettled([
-        // VIX من Polygon
-        fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY&apiKey=${API_KEY}`).then(r=>r.json()),
-        // Put/Call Ratio (نسبة تقريبية من حجم SPY options)
-        fetch(`${BASE}/v3/reference/options/SPY?limit=10&apiKey=${API_KEY}`).then(r=>r.json()),
-        // Fear & Greed من CNN
-        fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata'),
-      ]);
+      // VIX من Polygon عبر VIXY ETF
+      let vix = null;
+      try {
+        const vixRes  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY,UVXY&apiKey=${API_KEY}`);
+        const vixData = await vixRes.json();
+        vix = vixData?.tickers?.[0]?.day?.c || null;
+      } catch(e) {}
 
-      // VIX
-      const vix = vixR.status==='fulfilled' ? vixR.value?.tickers?.[0]?.day?.c : null;
+      // Fear & Greed من CNN
+      let fearGreed = null;
+      try {
+        const fgRes  = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+        });
+        if(fgRes.ok) {
+          const fgData = await fgRes.json();
+          fearGreed = fgData?.fear_and_greed?.score
+            || fgData?.score
+            || fgData?.data?.[fgData.data.length-1]?.y
+            || null;
+        }
+      } catch(e) {}
 
-      // Fear & Greed
-      let fg = null;
-      if (fgR.status==='fulfilled') {
+      // Fallback: احسب Fear&Greed تقريبياً من SPY performance
+      if(!fearGreed) {
         try {
-          const fgData = await fgR.value.json();
-          fg = fgData?.fear_and_greed?.score || fgData?.score || null;
+          const spyRes  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=SPY&apiKey=${API_KEY}`);
+          const spyData = await spyRes.json();
+          const spyChg  = spyData?.tickers?.[0]?.todaysChangePerc || 0;
+          // تقدير تقريبي: +2% ≈ جشع 70، -2% ≈ خوف 30
+          fearGreed = Math.min(95, Math.max(5, 50 + spyChg * 10));
         } catch(e) {}
       }
 
-      return res.json({ type:'market', vix, fearGreed: fg });
+      return res.status(200).json({ type:'market', vix, fearGreed });
     }
 
     res.status(400).json({ error: 'unknown type' });
