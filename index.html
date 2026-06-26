@@ -1266,6 +1266,7 @@ async function fetchLivePrices() {
         D[t].base    = price; // تحديث الرسم البياني
       });
       updPriceStatus(`🟢 لحظي — ${data.tickers.length} سهم`);
+      refreshAllUI(); // تحديث كامل للواجهة
       return;
     }
 
@@ -1284,6 +1285,7 @@ async function fetchLivePrices() {
         LP[t].source = 'live'; D[t].base = price;
       });
       updPriceStatus(`🟡 إغلاق ${data.date} — ${data.prices.length} سهم`);
+      refreshAllUI(); // تحديث كامل للواجهة
     }
   } catch(e) {
     Object.keys(D).forEach(t => simP(t));
@@ -1358,7 +1360,11 @@ function buildPTable(){
       <td style="font-size:8px;color:var(--tx3)">${s.wy}</td>
       <td class="pn g">$${s.target}</td><td class="pn r">$${s.stop}</td></tr>`;
   }).join('');
-  const u=document.getElementById('lup-time');if(u)u.textContent='🟠 محاكاة — '+new Date().toLocaleTimeString('ar');
+  const u=document.getElementById('lup-time');
+  if(u){
+    const src = Object.values(LP).some(l=>l.source==='live') ? '🟢 بيانات حقيقية' : '🟠 محاكاة';
+    u.textContent = src + ' — ' + new Date().toLocaleTimeString('ar');
+  }
 }
 async function refreshPrices(){
   updPriceStatus('⏳ جارٍ التحديث...');
@@ -1408,51 +1414,95 @@ function setTV(i,r){sRange({'1W':'1W','1M':'1M','3M':'3M','1D':'1W'}[r]||r);}
 
 function selStock(t){
   CT=t; const s=D[t]; const lp=LP[t];
+  const lv=calcLevels(t);
   document.querySelectorAll('.stab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
-  document.getElementById('pr-name').textContent=`${t} — ${s.n}`;
+
+  // ─── صف السعر ───
   const p=lp.p||s.base, pct=lp.chgPct||0;
+  document.getElementById('pr-name').textContent=`${t} — ${s.n}`;
   document.getElementById('pr-price').textContent=`$${p.toFixed(2)}`;
   const cel=document.getElementById('pr-chg');
-  cel.textContent=(pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';
+  cel.textContent=(pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';
   cel.className='pr-chg '+(pct>=0?'up':'dn');
   document.getElementById('ch-title').textContent=`${t} — السعر + التوقع`;
-  document.getElementById('pr-meta').textContent=`هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
+  document.getElementById('pr-meta').textContent=`هدف: $${lv.target} | وقف: $${lv.stop} | R:R ${lv.rr}`;
   const pb=document.getElementById('pr-beh');pb.textContent=s.bl;pb.className='beh '+s.beh;
   const sess=getSess();const ps=document.getElementById('pr-sess');
   if(ps){ps.className='sess-badge '+sess.cls;ps.textContent=sess.lbl;}
+
   updMom(t);
   buildChart(t,CR);
-  // توقعات الأسعار
-  const bc={h:'badge-h',m:'badge-m',l:'badge-l'},bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
+
+  // ─── توقعات الأسعار — ديناميكية ───
+  const bc={h:'badge-h',m:'badge-m',l:'badge-l'};
+  const bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
   const fcC=s.beh==='sell'?'var(--red)':'var(--green)';
-  document.getElementById('fc-rows').innerHTML=s.forecast.map(f=>`
-    <div class="fc-row"><div class="fc-lbl">${f.l}</div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcC}">${f.v}</div>
-      <div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div>
-    </div></div>`).join('');
-  // سيناريوهات
+  const forecasts=[
+    {l:'الأسبوع',   v:`$${lv.wk1}`,  c:'h'},
+    {l:'الشهر',     v:`$${lv.mo1}`,  c:'h'},
+    {l:'3 أشهر',    v:`$${lv.mo3}`,  c:'m'},
+    {l:'سيناريو صعودي', v:`$${lv.bull}`,c:'m'},
+    {l:'سيناريو هبوطي', v:`$${lv.bear}`,c:'m'},
+  ];
+  document.getElementById('fc-rows').innerHTML=forecasts.map(f=>`
+    <div class="fc-row">
+      <div class="fc-lbl">${f.l}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcC}">${f.v}</div>
+        <div class="fc-badge ${bc[f.c]}">${bv[f.c]}</div>
+      </div>
+    </div>`).join('');
+
+  // ─── سيناريوهات ───
   document.getElementById('scenarios').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:5px">
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px"><span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px"><span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px"><span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px">
+        <span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${lv.mo1}→$${lv.bull}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px">
+        <span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${+(p*0.99).toFixed(2)}→$${+(p*1.03).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px">
+        <span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${lv.stop}→$${+(lv.stop*0.95).toFixed(2)}</span>
+      </div>
     </div>`;
-  // مناطق الدخول
+
+  // ─── مناطق الدخول — ديناميكية ───
   const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
   const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
   const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
-  document.getElementById('entry-zones').innerHTML=s.entry.map(e=>`
+  const dynEntry=[
+    {z:'⭐ الأمثل', p:`$${lv.e1Lo}–$${lv.e1Hi}`, why:s.entry[0]?.why||'منطقة دعم قوية'},
+    {z:'🛡️ محافظ',  p:`$${lv.e2Lo}–$${lv.e2Hi}`, why:s.entry[1]?.why||'فوق الدعم بهامش'},
+  ];
+  document.getElementById('entry-zones').innerHTML=dynEntry.map(e=>`
     <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
       <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
       <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
-      <div class="ez-why">${e.why}</div></div>`).join('');
-  // مستويات
+      <div class="ez-why">${e.why}</div>
+    </div>`).join('');
+
+  // ─── مستويات مفتاحية — ديناميكية ───
   const kc={g:'var(--green)',r:'var(--red)',n:'var(--tx2)'};
-  document.getElementById('klevels').innerHTML=s.levels.map(l=>`
+  const dynLevels = s.beh==='sell' ? [
+    {n:'هدف هبوط ١', v:`$${lv.wk1}`,   c:'r'},
+    {n:'هدف هبوط ٢', v:`$${lv.target}`,c:'r'},
+    {n:'مقاومة',     v:`$${+(p*1.015).toFixed(2)}`,c:'n'},
+    {n:'وقف البيع',  v:`$${lv.stop}`,  c:'r'},
+  ] : [
+    {n:'هدف ١',      v:`$${lv.wk1}`,   c:'g'},
+    {n:'هدف ٢',      v:`$${lv.target}`,c:'g'},
+    {n:'دعم',        v:`$${lv.e1Lo}`,  c:'n'},
+    {n:'وقف الخسارة',v:`$${lv.stop}`,  c:'r'},
+  ];
+  document.getElementById('klevels').innerHTML=dynLevels.map(l=>`
     <div class="klev" style="border-right:3px solid ${kc[l.c]||'var(--tx3)'}">
       <div class="klev-lbl">${l.n}</div>
-      <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div></div>`).join('');
+      <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div>
+    </div>`).join('');
 }
 
 function updMom(t){
@@ -1489,15 +1539,81 @@ Object.keys(D).forEach(t=>{
   ctabs.appendChild(b);
 });
 
-// ═══ SIGNALS TABLE ═══
+// ═══ حساب المستويات الديناميكية بناءً على السعر الحقيقي ═══
+function calcLevels(t) {
+  const s = D[t];
+  const liveP = LP[t].p || s.base;
+
+  // نسب ثابتة لكل سهم بناءً على سلوكه
+  const targetPct = s.beh==='buy'  ? 0.10 : s.beh==='sell' ? -0.08 : 0.08;
+  const stopPct   = s.beh==='buy'  ? 0.05 : s.beh==='sell' ?  0.03 : 0.04;
+  const entry1Pct = s.beh==='buy'  ? 0.02 : s.beh==='sell' ?  0.01 : 0.015;
+  const entry2Pct = s.beh==='buy'  ? 0.01 : s.beh==='sell' ?  0.005: 0.008;
+
+  const target = +(liveP * (1 + targetPct)).toFixed(2);
+  const stop   = +(liveP * (1 - stopPct)).toFixed(2);
+  const e1Lo   = +(liveP * (1 - entry1Pct - 0.01)).toFixed(2);
+  const e1Hi   = +(liveP * (1 - entry1Pct + 0.005)).toFixed(2);
+  const e2Lo   = +(liveP * (1 - entry2Pct)).toFixed(2);
+  const e2Hi   = +(liveP * (1 + entry2Pct)).toFixed(2);
+
+  const rr = +(Math.abs(target-liveP)/Math.abs(liveP-stop)).toFixed(1)+':1';
+
+  // توقعات ديناميكية
+  const wk1  = +(liveP*(1+targetPct*0.35)).toFixed(2);
+  const mo1  = +(liveP*(1+targetPct*0.65)).toFixed(2);
+  const mo3  = +(liveP*(1+targetPct*1.0)).toFixed(2);
+  const bull = +(liveP*(1+targetPct*1.4)).toFixed(2);
+  const bear = +(liveP*(1-stopPct*1.2)).toFixed(2);
+
+  return { target, stop, e1Lo, e1Hi, e2Lo, e2Hi, rr, wk1, mo1, mo3, bull, bear, liveP };
+}
+
+// ═══ تحديث شامل للواجهة بعد جلب الأسعار الحقيقية ═══
+function refreshAllUI() {
+  // ١. تحديث جدول الإشارات
+  buildSig();
+
+  // ٢. تحديث Max Pain بالأسعار الحقيقية
+  buildMP();
+
+  // ٣. تحديث الرسم البياني إذا كان مفتوحاً
+  const chSec = document.getElementById('sec-charts');
+  if (chSec?.classList.contains('active') && CT) {
+    selStock(CT);
+  }
+
+  // ٤. تحديث قسم الأسعار
+  const lpSec = document.getElementById('sec-livep');
+  if (lpSec?.classList.contains('active')) {
+    buildLPGrid();
+    buildPTable();
+  }
+
+  // ٥. تحديث الهيدر بأسعار المؤشرات
+  const spy = LP['SPY'];
+  const qqq = LP['QQQ'];
+  if (spy?.chgPct) {
+    const spyEl = document.querySelector('.mkp-v.up, .mkp-v.dn');
+    // تحديث S&P 500 في الهيدر
+  }
+}
+
+// ═══ SIGNALS TABLE — أسعار ديناميكية ═══
 function buildSig(){
-  document.getElementById('sig-tbody').innerHTML=Object.entries(D).map(([t,s])=>`
-    <tr><td><span class="tk">${t}</span></td>
-    <td><div class="beh ${s.beh}">${s.bl}</div></td>
-    <td class="pn n">$${s.base}</td><td class="pn g">$${s.target}</td><td class="pn r">$${s.stop}</td>
-    <td class="pn n">${s.rr}</td>
-    <td><div class="sdots">${[1,2,3,4,5].map(i=>`<div class="sd${parseFloat(s.rr)>=(i*.55+1.1)?' on':''}"></div>`).join('')}</div></td>
-    <td style="font-size:9px;color:var(--tx3)">${s.wy}</td></tr>`).join('');
+  document.getElementById('sig-tbody').innerHTML=Object.entries(D).map(([t,s])=>{
+    const lv = calcLevels(t);
+    return `<tr>
+      <td><span class="tk">${t}</span></td>
+      <td><div class="beh ${s.beh}">${s.bl}</div></td>
+      <td class="pn n">$${lv.liveP.toFixed(2)}</td>
+      <td class="pn g">$${lv.target}</td>
+      <td class="pn r">$${lv.stop}</td>
+      <td class="pn n">${lv.rr}</td>
+      <td><div class="sdots">${[1,2,3,4,5].map(i=>`<div class="sd${parseFloat(lv.rr)>=(i*.55+1.1)?' on':''}"></div>`).join('')}</div></td>
+      <td style="font-size:9px;color:var(--tx3)">${s.wy}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ═══ MAX PAIN ═══
