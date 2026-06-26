@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Smart Money Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+/* ─── TOKENS ─── */
+:root {
+  --bg:     #05080D;
+  --s1:     #0A0F18;
+  --s2:     #0F1822;
+  --s3:     #16202E;
+  --bd:     #1C2D40;
+  --bd2:    #253850;
+  --gold:   #C9A84C;
+  --gdim:   #7A5A20;
+  --gglow:  rgba(201,168,76,.12);
+  --cyan:   #00D4FF;
+  --green:  #00E676;
+  --red:    #FF4560;
+  --orange: #FF9F43;
+  --purple: #A855F7;
+  --blue:   #3B82F6;
+  --tx:     #D8E2EC;
+  --tx2:    #6B8090;
+  --tx3:    #2E4255;
+
+  /* iPad safe areas */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  /* Layout */
+  --nav-h:   72px;
+  --hdr-h:   60px;
+  --sess-h:  36px;
+}
+
+/* ─── RESET ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: 100%; overflow: hidden; }
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--tx);
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ─── GRID BACKGROUND ─── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(201,168,76,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,168,76,.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+/* ─── APP SHELL ─── */
+.app-shell {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  z-index: 1;
+}
+
+/* ─── HEADER ─── */
+.app-header {
+  flex-shrink: 0;
+  height: var(--hdr-h);
+  background: rgba(5,8,13,.95);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center;
+  padding: 0 20px;
+  gap: 14px;
+  z-index: 50;
+}
+
+.hdr-logo {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--gold), #5A3C0E);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+  box-shadow: 0 0 20px var(--gglow);
+}
+
+.hdr-info { flex: 1; min-width: 0; }
+.hdr-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.hdr-sub { font-size: 10px; color: var(--tx3); margin-top: 1px; }
+
+.live-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,230,118,.08);
+  border: 1px solid rgba(0,230,118,.18);
+  padding: 5px 11px; border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: var(--green);
+  flex-shrink: 0;
+}
+.live-dot {
+  width: 5px; height: 5px;
+  background: var(--green); border-radius: 50%;
+  animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+.mkt-pills { display: flex; gap: 8px; flex-shrink: 0; }
+.mkp {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 4px 10px;
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 8px; min-width: 60px;
+}
+.mkp-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700;
+}
+.mkp-v.up { color: var(--green); }
+.mkp-v.dn { color: var(--red); }
+.mkp-v.neu { color: var(--orange); }
+.mkp-l { font-size: 8px; color: var(--tx3); margin-top: 1px; }
+
+/* ─── SESSION STRIP ─── */
+.sess-strip {
+  flex-shrink: 0;
+  height: var(--sess-h);
+  background: var(--s1);
+  border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center;
+  padding: 0 18px; gap: 10px;
+  overflow-x: auto;
+}
+.sess-strip::-webkit-scrollbar { display: none; }
+.sess-badge {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+}
+.sb-open  { background: rgba(0,230,118,.1); border: 1px solid rgba(0,230,118,.2); color: var(--green); }
+.sb-pre   { background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.2); color: var(--purple); }
+.sb-after { background: rgba(255,159,67,.1); border: 1px solid rgba(255,159,67,.2); color: var(--orange); }
+.sb-night { background: var(--s2); border: 1px solid var(--bd); color: var(--tx3); }
+.sess-desc { font-size: 10px; color: var(--tx3); white-space: nowrap; }
+.sess-spacer { flex: 1; }
+.nytime {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; color: var(--tx3); white-space: nowrap; flex-shrink: 0;
+}
+
+/* ─── SCROLL CONTENT ─── */
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  position: relative;
+}
+.app-content::-webkit-scrollbar { width: 2px; }
+.app-content::-webkit-scrollbar-track { background: transparent; }
+.app-content::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 1px; }
+
+/* ─── SECTIONS ─── */
+.sec {
+  display: none;
+  padding: 16px;
+  min-height: 100%;
+  animation: secIn .22s ease;
+}
+.sec.active { display: block; }
+@keyframes secIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+/* ─── BOTTOM NAV ─── */
+.app-nav {
+  flex-shrink: 0;
+  height: var(--nav-h);
+  background: rgba(5,8,13,.97);
+  backdrop-filter: blur(20px) saturate(200%);
+  -webkit-backdrop-filter: blur(20px) saturate(200%);
+  border-top: 1px solid var(--bd);
+  display: flex;
+  overflow-x: auto;
+  padding: 0 4px;
+}
+.app-nav::-webkit-scrollbar { display: none; }
+
+.nav-item {
+  flex: 1;
+  min-width: 56px;
+  max-width: 80px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px;
+  padding: 8px 4px;
+  cursor: pointer;
+  border-radius: 12px;
+  margin: 6px 2px;
+  transition: background .15s, color .15s;
+  color: var(--tx3);
+  border: 1px solid transparent;
+  /* 44px minimum touch target */
+  min-height: 44px;
+}
+.nav-item .nav-icon { font-size: 20px; line-height: 1; }
+.nav-item .nav-lbl  { font-size: 9px; font-weight: 600; line-height: 1; text-align: center; white-space: nowrap; }
+
+.nav-item:hover  { background: var(--gglow); color: var(--gold); }
+.nav-item.active {
+  background: var(--gglow);
+  border-color: var(--gdim);
+  color: var(--gold);
+}
+.nav-item.active .nav-lbl { color: var(--gold); }
+
+/* ─── GRIDS ─── */
+.g2  { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+.g5  { display: grid; grid-template-columns: repeat(5,1fr); gap: 9px; }
+.mb10 { margin-bottom: 10px; }
+.mb14 { margin-bottom: 14px; }
+.sp2 { grid-column: span 2; }
+
+/* ─── CARD ─── */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 13px;
+  padding: 15px;
+  position: relative; overflow: hidden;
+}
+.card-stripe {
+  position: absolute; top: 0; right: 0;
+  width: 44px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold));
+}
+.card-title {
+  font-size: 9px; font-weight: 700;
+  color: var(--tx3); text-transform: uppercase;
+  letter-spacing: .1em; margin-bottom: 11px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ─── STAT CARD ─── */
+.stat-card {
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 14px 15px;
+  display: flex; align-items: center; gap: 12px;
+}
+.stat-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; flex-shrink: 0;
+}
+.si-g { background: var(--gglow); }
+.si-c { background: rgba(0,212,255,.08); }
+.si-gr { background: rgba(0,230,118,.08); }
+.si-r { background: rgba(255,69,96,.08); }
+.stat-val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: 9px; color: var(--tx3); margin-top: 3px; }
+.stat-ch  { font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-top: 2px; }
+.up { color: var(--green); } .dn { color: var(--red); } .wa { color: var(--orange); }
+
+/* ─── BEHAVIOR BADGE ─── */
+.beh {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 5px;
+  font-size: 10px; font-weight: 700;
+}
+.beh.buy  { background: rgba(0,230,118,.1);  color: var(--green);  border: 1px solid rgba(0,230,118,.2); }
+.beh.sell { background: rgba(255,69,96,.1);   color: var(--red);    border: 1px solid rgba(255,69,96,.2); }
+.beh.watch{ background: rgba(168,85,247,.1); color: var(--purple); border: 1px solid rgba(168,85,247,.2); }
+
+/* ─── LIVE PRICE CARD ─── */
+.lpc {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: 12px; padding: 13px;
+  position: relative; overflow: hidden;
+  transition: border-color .15s;
+}
+.lpc::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 1px; background: linear-gradient(90deg,transparent,var(--gold),transparent);
+}
+.lpc-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: var(--tx2); margin-bottom: 3px; display: flex; justify-content: space-between; }
+.lpc-price { font-family: 'JetBrains Mono', monospace; font-size: 19px; font-weight: 700; line-height: 1; }
+.lpc-chg  { font-family: 'JetBrains Mono', monospace; font-size: 10px; margin-top: 2px; }
+.lpc-ext  { font-size: 8px; color: var(--tx3); margin-top: 4px; }
+.lpc-beh  { margin-top: 7px; }
+@keyframes pf { 0%{opacity:.4} 100%{opacity:1} }
+.pflash { animation: pf .4s ease; }
+
+/* ─── SESSION CARDS ─── */
+.sess-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.sess-card {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 11px;
+  transition: border-color .15s;
+}
+.sess-card.active-sess { border-color: var(--gold); background: var(--gglow); }
+.sc-label { font-size: 9px; font-weight: 700; margin-bottom: 3px; }
+.sc-time  { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; }
+.sc-desc  { font-size: 8px; color: var(--tx3); margin-top: 3px; line-height: 1.5; }
+
+/* ─── CHARTS ─── */
+.chart-wrap {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 12px; overflow: hidden; margin-bottom: 12px;
+}
+.chart-header {
+  padding: 12px 14px; border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+}
+.chart-title { font-size: 11px; font-weight: 700; }
+.chart-btns { display: flex; gap: 5px; }
+.chart-btn {
+  padding: 5px 12px; border-radius: 6px;
+  font-size: 10px; font-weight: 700;
+  border: 1px solid var(--bd); background: transparent;
+  color: var(--tx3); cursor: pointer;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  /* 44px touch friendly with combined area */
+  min-height: 32px;
+  transition: all .12s;
+}
+.chart-btn:hover, .chart-btn.active {
+  background: var(--gglow); border-color: var(--gdim); color: var(--gold);
+}
+.chart-inner { padding: 12px; }
+.chart-legend {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  padding: 9px 14px; border-top: 1px solid var(--bd);
+}
+.leg { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--tx2); }
+.leg-line { width: 12px; height: 2px; border-radius: 1px; }
+
+/* ─── MOMENTUM PANEL ─── */
+.mom-panel {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 12px; padding: 14px; margin-bottom: 12px;
+}
+.mom-panel-title {
+  font-size: 9px; font-weight: 700; color: var(--tx3);
+  text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px;
+}
+.mom-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.mom-item {
+  background: var(--s3); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 10px; text-align: center;
+}
+.mom-lbl { font-size: 8px; color: var(--tx3); margin-bottom: 4px; }
+.mom-val { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
+.mom-sig { font-size: 8px; margin-top: 2px; font-weight: 600; }
+.mom-bar-wrap {
+  height: 7px; background: var(--s3); border-radius: 4px;
+  overflow: hidden; margin: 10px 0 5px;
+}
+.mom-bar-fill { height: 100%; border-radius: 4px; transition: width .5s ease; }
+.mom-bar-labels { display: flex; justify-content: space-between; font-size: 8px; color: var(--tx3); }
+
+/* ─── PRICE FORECAST ─── */
+.forecast-card {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 13px;
+}
+.forecast-title { font-size: 9px; font-weight: 700; color: var(--tx3); text-transform: uppercase; margin-bottom: 10px; }
+.fc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0; border-bottom: 1px solid rgba(28,45,64,.5);
+}
+.fc-row:last-child { border-bottom: none; }
+.fc-lbl { font-size: 9px; color: var(--tx2); }
+.fc-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+.fc-badge { font-size: 8px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.badge-h { background: rgba(0,230,118,.1); color: var(--green); }
+.badge-m { background: rgba(255,159,67,.1); color: var(--orange); }
+.badge-l { background: rgba(255,69,96,.1); color: var(--red); }
+
+/* ─── ENTRY ZONES ─── */
+.entry-zone {
+  border-radius: 9px; padding: 11px;
+  margin-bottom: 8px; border: 1px solid;
+}
+.entry-zone:last-child { margin-bottom: 0; }
+.ez-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
+.ez-price { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; line-height: 1.1; }
+.ez-why   { font-size: 8px; color: var(--tx3); margin-top: 4px; line-height: 1.55; }
+
+/* ─── KEY LEVELS ─── */
+.klev {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 11px; background: var(--s2);
+  border: 1px solid var(--bd); border-radius: 7px;
+  margin-bottom: 6px;
+}
+.klev:last-child { margin-bottom: 0; }
+.klev-lbl { font-size: 9px; color: var(--tx3); }
+.klev-val { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; }
+
+/* ─── STOCK TABS ─── */
+.stock-tabs {
+  display: flex; gap: 5px;
+  overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px;
+}
+.stock-tabs::-webkit-scrollbar { display: none; }
+.stab {
+  padding: 7px 13px; border-radius: 8px; flex-shrink: 0;
+  font-size: 10px; font-weight: 700;
+  border: 1px solid var(--bd); background: var(--s2);
+  color: var(--tx3); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all .12s; min-height: 34px;
+}
+.stab.active { background: var(--gglow); border-color: var(--gold); color: var(--gold); }
+
+/* ─── PRICE ROW ─── */
+.price-row {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 12px; padding: 12px 14px;
+  background: var(--s3); border-radius: 10px; margin-bottom: 10px;
+}
+.pr-price { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700; }
+.pr-chg   { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; }
+
+/* ─── SIGNAL TABLE ─── */
+.sig-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.sig-tbl th {
+  text-align: right; padding: 9px 10px;
+  border-bottom: 1px solid var(--bd);
+  font-size: 8px; font-weight: 700; color: var(--tx3);
+  text-transform: uppercase; letter-spacing: .07em; white-space: nowrap;
+}
+.sig-tbl td { padding: 10px 10px; border-bottom: 1px solid rgba(28,45,64,.35); vertical-align: middle; }
+.sig-tbl tr:last-child td { border-bottom: none; }
+.sig-tbl tr:hover td { background: var(--s2); }
+.tk { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--cyan); }
+.pn { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.pn.g{color:var(--green)} .pn.r{color:var(--red)} .pn.n{color:var(--tx2)}
+.sdots { display: flex; gap: 2px; }
+.sd { width: 6px; height: 6px; border-radius: 50%; background: var(--bd); }
+.sd.on { background: var(--gold); }
+
+/* ─── POOLS / VOLUMES ─── */
+.pool-row, .vol-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 0; border-bottom: 1px solid rgba(28,45,64,.4);
+}
+.pool-row:last-child, .vol-row:last-child { border-bottom: none; }
+.pool-t  { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+.pool-s  { font-size: 8px; color: var(--tx3); margin-top: 1px; }
+.pool-pct{ font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--purple); }
+.vol-t   { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; min-width: 44px; }
+.vol-bar { flex: 1; height: 4px; background: var(--bd); border-radius: 2px; }
+.vol-fill{ height: 100%; border-radius: 2px; transition: width .5s; }
+.vf-bull { background: linear-gradient(90deg, transparent, var(--green)); }
+.vf-bear { background: linear-gradient(90deg, transparent, var(--red)); }
+.vf-neu  { background: linear-gradient(90deg, transparent, var(--gdim)); }
+.vol-v   { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--tx2); min-width: 38px; text-align: left; }
+
+/* ─── FLOW ─── */
+.flow-item { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid rgba(28,45,64,.4); }
+.flow-item:last-child { border-bottom: none; }
+.flow-badge {
+  width: 26px; height: 26px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; flex-shrink: 0;
+}
+.fb-c { background: rgba(0,230,118,.1); color: var(--green); border: 1px solid rgba(0,230,118,.2); }
+.fb-p { background: rgba(255,69,96,.1);  color: var(--red);   border: 1px solid rgba(255,69,96,.2); }
+.flow-tk   { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: var(--cyan); }
+.flow-meta { font-size: 8px; color: var(--tx3); margin-top: 1px; line-height: 1.4; }
+.flow-sz   { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; }
+.fs-b { color: var(--green); } .fs-s { color: var(--red); }
+
+/* ─── WYCKOFF ─── */
+.wy-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 9px; margin-bottom: 11px; }
+.wy-card {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 13px; text-align: center;
+  cursor: pointer; min-height: 44px; transition: all .15s;
+}
+.wy-card:hover, .wy-card.active { border-color: var(--gold); background: var(--gglow); }
+.wy-en  { font-family: 'JetBrains Mono', monospace; font-size: 7px; font-weight: 700; color: var(--gold); margin-bottom: 2px; }
+.wy-ar  { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.wy-d   { font-size: 8px; color: var(--tx3); line-height: 1.5; }
+
+/* ─── PATTERNS ─── */
+.pat-card { background: var(--s1); border: 1px solid var(--bd); border-radius: 10px; padding: 14px; margin-bottom: 9px; }
+.pat-name { font-size: 12px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.pat-en   { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--tx3); font-weight: 400; }
+.pat-desc { font-size: 10px; color: var(--tx2); line-height: 1.65; margin-bottom: 7px; }
+.pat-tip  { font-size: 9px; padding: 6px 9px; border-radius: 6px; line-height: 1.5; }
+
+/* ─── ROADMAP ─── */
+.rm-phase { background: var(--s1); border: 1px solid var(--bd); border-radius: 12px; padding: 16px; margin-bottom: 10px; position: relative; overflow: hidden; }
+.rm-phase::before { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 3px; }
+.rmp1::before { background: var(--gold); }
+.rmp2::before { background: var(--cyan); }
+.rmp3::before { background: var(--purple); }
+.rmp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.rmp-sub { font-size: 8px; color: var(--tx3); margin-bottom: 2px; }
+.rmp-name { font-size: 13px; font-weight: 700; }
+.rmp-dur { padding: 3px 9px; border-radius: 12px; font-size: 9px; font-weight: 600; background: var(--s2); border: 1px solid var(--bd); color: var(--tx2); }
+.checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.ck-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--tx2); }
+.ck-box {
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1px solid var(--bd2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; font-size: 9px;
+  transition: all .12s;
+  /* 44px touch via parent row */
+}
+.ck-box.checked { background: var(--green); border-color: var(--green); color: #000; }
+
+/* ─── RULES ─── */
+.rule-item { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid rgba(28,45,64,.5); }
+.rule-item:last-child { border-bottom: none; }
+.rule-n { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: var(--gold); min-width: 24px; line-height: 1.2; }
+.rule-t { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+.rule-s { font-size: 10px; color: var(--tx3); line-height: 1.55; }
+
+/* ─── FG GAUGE ─── */
+.fg-num { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; color: var(--orange); text-align: center; line-height: 1; }
+.fg-lbl { font-size: 12px; font-weight: 600; color: var(--orange); text-align: center; margin-top: 4px; }
+.fg-sub { font-size: 9px; color: var(--tx3); text-align: center; margin-top: 3px; }
+
+/* ─── AI SECTION ─── */
+.ai-qp { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.qp-btn {
+  padding: 6px 11px; background: var(--s2);
+  border: 1px solid var(--bd); border-radius: 7px;
+  font-size: 9px; color: var(--tx2); cursor: pointer;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  transition: all .12s; min-height: 34px;
+}
+.qp-btn:hover { border-color: var(--gdim); color: var(--gold); background: var(--gglow); }
+.ai-row {
+  display: flex; gap: 8px;
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 10px 13px; margin-bottom: 10px;
+}
+.ai-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--tx); font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 13px; direction: rtl;
+  /* min-height for touch */
+  min-height: 24px;
+}
+.ai-input::placeholder { color: var(--tx3); }
+.ai-send-btn {
+  background: linear-gradient(135deg, var(--gold), #6B4E10);
+  border: none; border-radius: 8px;
+  padding: 9px 18px; color: #000;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+  min-height: 40px; /* touch target */
+  transition: opacity .12s;
+}
+.ai-send-btn:hover   { opacity: .88; }
+.ai-send-btn:disabled{ opacity: .4; cursor: not-allowed; }
+.ai-resp {
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 10px; padding: 14px;
+  font-size: 11px; line-height: 1.85; color: var(--tx2);
+  white-space: pre-wrap; display: none;
+}
+.ai-resp.loading { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--tx3); min-height: 52px; }
+.ald span { display: inline-block; width: 5px; height: 5px; background: var(--gold); border-radius: 50%; animation: ldot 1.1s infinite; }
+.ald span:nth-child(2) { animation-delay: .18s; }
+.ald span:nth-child(3) { animation-delay: .36s; }
+@keyframes ldot { 0%,100%{opacity:.2;transform:scale(.7)} 50%{opacity:1;transform:scale(1)} }
+
+/* ─── BOT PANEL ─── */
+.bot-fab {
+  position: fixed; left: 20px;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), #5A3C0E);
+  border: none; cursor: pointer; font-size: 24px;
+  box-shadow: 0 4px 24px rgba(201,168,76,.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; transition: transform .2s;
+}
+.bot-fab:hover { transform: scale(1.08); }
+
+.bot-panel {
+  position: fixed;
+  left: 12px; right: 12px;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 82px);
+  max-height: 70vh;
+  background: var(--s1);
+  border: 1px solid var(--bd2);
+  border-radius: 18px;
+  display: none; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 50px rgba(0,0,0,.7);
+  z-index: 99;
+}
+.bot-panel.open { display: flex; }
+
+.bot-hdr {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(201,168,76,.12), rgba(201,168,76,.04));
+  border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.bot-name { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+.bot-status { font-size: 8px; color: var(--green); display: flex; align-items: center; gap: 3px; }
+.bot-close-btn {
+  background: none; border: none; color: var(--tx3); cursor: pointer;
+  font-size: 18px; padding: 4px 8px; min-height: 44px; min-width: 44px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.bot-msgs {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 9px;
+  -webkit-overflow-scrolling: touch;
+}
+.bot-msgs::-webkit-scrollbar { width: 2px; }
+.bot-msgs::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 1px; }
+
+.msg {
+  max-width: 90%; padding: 10px 13px;
+  border-radius: 12px; font-size: 11px; line-height: 1.7;
+}
+.msg.bot  { background: var(--s2); border: 1px solid var(--bd); color: var(--tx); border-radius: 12px 12px 12px 4px; align-self: flex-start; }
+.msg.user { background: rgba(201,168,76,.14); border: 1px solid rgba(201,168,76,.2); color: var(--tx); border-radius: 12px 12px 4px 12px; align-self: flex-end; }
+
+.bot-quick {
+  display: flex; gap: 5px; padding: 0 12px 9px;
+  overflow-x: auto; flex-shrink: 0;
+}
+.bot-quick::-webkit-scrollbar { display: none; }
+.bq-btn {
+  padding: 5px 10px; background: var(--s3);
+  border: 1px solid var(--bd); border-radius: 6px;
+  font-size: 9px; color: var(--tx2); cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  min-height: 34px; transition: all .12s;
+}
+.bq-btn:hover { border-color: var(--gdim); color: var(--gold); }
+
+.bot-input-row {
+  padding: 10px 12px; border-top: 1px solid var(--bd);
+  display: flex; gap: 8px; flex-shrink: 0;
+}
+.bot-input {
+  flex: 1; background: var(--s2); border: 1px solid var(--bd);
+  border-radius: 8px; padding: 9px 13px;
+  color: var(--tx); font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 12px; direction: rtl; outline: none;
+  min-height: 40px; /* touch target */
+}
+.bot-input:focus { border-color: var(--gdim); }
+.bot-send-btn {
+  background: linear-gradient(135deg, var(--gold), #6B4E10);
+  border: none; border-radius: 8px; padding: 9px 16px;
+  color: #000; font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 11px; font-weight: 700; cursor: pointer; min-height: 40px;
+}
+
+/* ─── SCROLLBAR (content) ─── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 2px; }
+
+/* ─── LANDSCAPE TWEAKS ─── */
+@media (orientation: landscape) and (min-height: 500px) {
+  :root { --nav-h: 60px; }
+  .nav-item .nav-icon { font-size: 17px; }
+  .nav-item .nav-lbl  { font-size: 8px; }
+  .app-header { height: 52px; }
+  :root { --hdr-h: 52px; }
+}
+
+/* ─── SMALL PHONE FALLBACK ─── */
+@media (max-width: 480px) {
+  .g3, .mom-grid, .wy-grid, .sess-cards { grid-template-columns: 1fr 1fr; }
+  .g4, .g5 { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ─── HEADER ─── -->
+  <header class="app-header">
+    <div class="hdr-logo">⚡</div>
+    <div class="hdr-info">
+      <div class="hdr-title">Smart Money Pro</div>
+      <div class="hdr-sub" id="sec-title">لوحة التحكم</div>
+    </div>
+    <div class="live-pill"><div class="live-dot"></div><span id="clk">--:--:--</span></div>
+    <div class="mkt-pills">
+      <div class="mkp"><div class="mkp-v up">▲0.84%</div><div class="mkp-l">S&P 500</div></div>
+      <div class="mkp"><div class="mkp-v dn">▼0.23%</div><div class="mkp-l">NASDAQ</div></div>
+      <div class="mkp"><div class="mkp-v neu">18.4</div><div class="mkp-l">VIX</div></div>
+      <div class="mkp"><div class="mkp-v neu">0.73</div><div class="mkp-l">P/C</div></div>
+    </div>
+  </header>
+
+  <!-- ─── SESSION STRIP ─── -->
+  <div class="sess-strip">
+    <div class="sess-badge sb-open" id="sbadge">✅ مفتوح</div>
+    <span class="sess-desc" id="sdesc">أعلى سيولة — أفضل وقت للتنفيذ</span>
+    <div class="sess-spacer"></div>
+    <span class="nytime" id="nyt">NY: --:--</span>
+  </div>
+
+  <!-- ─── SCROLLABLE CONTENT ─── -->
+  <div class="app-content" id="app-content">
+
+    <!-- ══════════ DASHBOARD ══════════ -->
+    <div class="sec active" id="sec-dashboard">
+      <div class="g4 mb14">
+        <div class="stat-card"><div class="stat-icon si-g">🐋</div><div><div class="stat-val">$2.8B</div><div class="stat-lbl">تدفق مؤسسي</div><div class="stat-ch up">▲ صافي شراء</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-c">📊</div><div><div class="stat-val">0.73</div><div class="stat-lbl">Put/Call</div><div class="stat-ch wa">⚠️ جشع</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-gr">🎯</div><div><div class="stat-val">15</div><div class="stat-lbl">أسهم مراقبة</div><div class="stat-ch up">▲ 5 إشارات</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-r">🌑</div><div><div class="stat-val">HIGH</div><div class="stat-lbl">Dark Pool</div><div class="stat-ch wa">! تراكم</div></div></div>
+      </div>
+
+      <div class="g2 mb14">
+        <!-- FEAR & GREED -->
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">🧭 الخوف والجشع</div>
+          <svg viewBox="0 0 180 90" width="150" style="display:block;margin:4px auto">
+            <path d="M15 80 A70 70 0 0 1 165 80" fill="none" stroke="#1C2D40" stroke-width="12" stroke-linecap="round"/>
+            <path d="M15 80 A70 70 0 0 1 165 80" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="66"/>
+            <defs><linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF4560"/><stop offset="50%" stop-color="#FF9F43"/><stop offset="100%" stop-color="#00E676"/></linearGradient></defs>
+            <line x1="90" y1="80" x2="124" y2="36" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="90" cy="80" r="5" fill="#C9A84C"/>
+          </svg>
+          <div class="fg-num">62</div>
+          <div class="fg-lbl">جشع</div>
+          <div class="fg-sub">تحذير: خطر تصحيح قريب</div>
+          <div class="g3" style="gap:6px;margin-top:10px">
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">23</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أسبوع</div></div>
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--orange)">48</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">شهر</div></div>
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--orange)">62</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">الآن</div></div>
+          </div>
+        </div>
+        <!-- DARK POOL -->
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">🌑 Dark Pool — السلوك</div>
+          <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">NVDA</div><div class="pool-s">4.2M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">68%</div><div class="beh buy">🟢 تراكم</div></div></div>
+          <div class="pool-row"><div><div class="pool-t">AAPL</div><div class="pool-s">2.8M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">54%</div><div class="beh sell">🔴 توزيع</div></div></div>
+          <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">META</div><div class="pool-s">1.6M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">74%</div><div class="beh buy">🟢 قوي</div></div></div>
+          <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">QQQ</div><div class="pool-s">6.1M وحدة</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">71%</div><div class="beh buy">🟢 شراء</div></div></div>
+          <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">GOOGL</div><div class="pool-s">2.2M سهم</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">63%</div><div class="beh buy">🟢 شراء</div></div></div>
+          <div class="pool-row"><div><div class="pool-t">TSLA</div><div class="pool-s">3.3M سهم</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">49%</div><div class="beh watch">👁 محايد</div></div></div>
+        </div>
+      </div>
+
+      <!-- VOLUME -->
+      <div class="card mb14">
+        <div class="card-stripe"></div>
+        <div class="card-title">📊 حجم غير طبيعي + تفسير السلوك</div>
+        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">NVDA</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:92%"></div></div><div class="vol-v">9.2x</div><div class="beh buy">🟢 تراكم</div></div>
+        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">META</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:80%"></div></div><div class="vol-v">8.0x</div><div class="beh buy">🟢 تراكم</div></div>
+        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">COIN</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:78%"></div></div><div class="vol-v">7.8x</div><div class="beh buy">🟢 عدواني</div></div>
+        <div class="vol-row"><div class="vol-t">AAPL</div><div class="vol-bar"><div class="vol-fill vf-bear" style="width:65%"></div></div><div class="vol-v">6.5x</div><div class="beh sell">🔴 توزيع</div></div>
+        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">GOOGL</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:60%"></div></div><div class="vol-v">6.0x</div><div class="beh buy">🟢 تراكم</div></div>
+        <div class="vol-row"><div class="vol-t">TSLA</div><div class="vol-bar"><div class="vol-fill vf-neu" style="width:38%"></div></div><div class="vol-v">3.8x</div><div class="beh watch">👁 انتظار</div></div>
+      </div>
+    </div>
+
+    <!-- ══════════ LIVE PRICES ══════════ -->
+    <div class="sec" id="sec-livep">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">💹 الأسعار اللحظية — كل الجلسات</div>
+      <div class="card mb14">
+        <div class="card-title">🕐 جلسات التداول (EST)</div>
+        <div class="sess-cards">
+          <div class="sess-card" id="sc-pre"><div class="sc-label" style="color:var(--purple)">🌙 ما قبل الافتتاح</div><div class="sc-time">4:00–9:30</div><div class="sc-desc">Pre-Market<br>سيولة منخفضة</div></div>
+          <div class="sess-card" id="sc-open"><div class="sc-label" style="color:var(--green)">✅ التداول الرئيسي</div><div class="sc-time">9:30–16:00</div><div class="sc-desc">Regular Hours<br>أعلى سيولة</div></div>
+          <div class="sess-card" id="sc-after"><div class="sc-label" style="color:var(--orange)">🌆 ما بعد الإغلاق</div><div class="sc-time">16:00–20:00</div><div class="sc-desc">After-Hours<br>نتائج الشركات</div></div>
+          <div class="sess-card" id="sc-night"><div class="sc-label" style="color:var(--tx3)">🌑 التداول الليلي</div><div class="sc-time">20:00–4:00</div><div class="sc-desc">Overnight<br>أخبار دولية</div></div>
+        </div>
+      </div>
+      <div class="g5 mb14" id="lp-grid"></div>
+      <div class="card">
+        <div class="card-stripe"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">📋 جدول كامل</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:8px;color:var(--tx3)" id="lup-time">—</span>
+            <button onclick="refreshPrices()" style="padding:8px 14px;border-radius:7px;background:var(--gglow);border:1px solid var(--gdim);color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:36px">🔄 تحديث</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="sig-tbl" id="ptable">
+            <thead><tr><th>الرمز</th><th>الجلسة</th><th>السعر</th><th>التغيير</th><th>Pre/After</th><th>الزخم</th><th>السلوك</th><th>Wyckoff</th><th>الهدف</th><th>وقف</th></tr></thead>
+            <tbody id="ptbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ CHARTS ══════════ -->
+    <div class="sec" id="sec-charts">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">📈 الرسوم البيانية + الزخم + التوقعات</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">ذهبي = فعلي | أزرق متقطع = توقع Smart Money | أخضر شفاف = منطقة الدخول</div>
+      <div class="stock-tabs" id="ctabs"></div>
+
+      <!-- PRICE ROW -->
+      <div class="price-row">
+        <div>
+          <div id="pr-name" style="font-size:9px;color:var(--tx3);margin-bottom:2px">NVDA — NVIDIA</div>
+          <div class="pr-price" id="pr-price">$142.80</div>
+        </div>
+        <div class="pr-chg up" id="pr-chg">▲ +2.4%</div>
+        <div id="pr-sess" class="sess-badge sb-open" style="font-size:9px">✅ مفتوح</div>
+        <div style="flex:1"></div>
+        <div style="font-size:9px;color:var(--tx3)" id="pr-meta">هدف: $158 | وقف: $138</div>
+        <div id="pr-beh" class="beh buy">🟢 تراكم</div>
+      </div>
+
+      <!-- MOMENTUM -->
+      <div class="mom-panel mb10">
+        <div class="mom-panel-title">⚡ لوحة الزخم — Momentum Dashboard</div>
+        <div class="mom-grid">
+          <div class="mom-item"><div class="mom-lbl">RSI (14)</div><div class="mom-val" id="m-rsi" style="color:var(--orange)">58.4</div><div class="mom-sig" id="m-rsi-s" style="color:var(--orange)">محايد</div></div>
+          <div class="mom-item"><div class="mom-lbl">MACD</div><div class="mom-val" id="m-macd" style="color:var(--green)">+2.14</div><div class="mom-sig" id="m-macd-s" style="color:var(--green)">🟢 صعودي</div></div>
+          <div class="mom-item"><div class="mom-lbl">Stochastic</div><div class="mom-val" id="m-sto" style="color:var(--orange)">72.3</div><div class="mom-sig" id="m-sto-s" style="color:var(--orange)">تشبع ⚠️</div></div>
+          <div class="mom-item"><div class="mom-lbl">ADX</div><div class="mom-val" id="m-adx" style="color:var(--green)">31.2</div><div class="mom-sig" id="m-adx-s" style="color:var(--green)">قوي</div></div>
+          <div class="mom-item"><div class="mom-lbl">Bollinger</div><div class="mom-val" id="m-bb" style="color:var(--tx2)">وسط</div><div class="mom-sig" id="m-bb-s" style="color:var(--tx3)">طبيعي</div></div>
+          <div class="mom-item"><div class="mom-lbl">EMA 20/50</div><div class="mom-val" id="m-ema" style="color:var(--green)">صاعد</div><div class="mom-sig" id="m-ema-s" style="color:var(--green)">Golden ✕</div></div>
+          <div class="mom-item"><div class="mom-lbl">حجم vs MA</div><div class="mom-val" id="m-vol" style="color:var(--cyan)">9.2x</div><div class="mom-sig" id="m-vol-s" style="color:var(--cyan)">غير طبيعي</div></div>
+          <div class="mom-item"><div class="mom-lbl">الزخم الكلي</div><div class="mom-val" id="m-tot" style="color:var(--green)">قوي</div><div class="mom-sig" id="m-tot-s" style="color:var(--green)">🟢 شراء</div></div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="font-size:8px;color:var(--tx3);margin-bottom:5px">مقياس الزخم الإجمالي</div>
+          <div class="mom-bar-wrap"><div class="mom-bar-fill" id="m-bar" style="width:72%;background:linear-gradient(90deg,var(--green),var(--cyan))"></div></div>
+          <div class="mom-bar-labels"><span style="color:var(--red)">بيع قوي</span><span>محايد</span><span style="color:var(--green)">شراء قوي</span></div>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="chart-wrap">
+        <div class="chart-header">
+          <div class="chart-title" id="ch-title">NVDA — السعر + التوقع</div>
+          <div class="chart-btns">
+            <button class="chart-btn active" onclick="sRange('1W')">1W</button>
+            <button class="chart-btn" onclick="sRange('1M')">1M</button>
+            <button class="chart-btn" onclick="sRange('3M')">3M</button>
+          </div>
+        </div>
+        <div class="chart-inner"><canvas id="MC" height="260"></canvas></div>
+        <div class="chart-legend">
+          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>السعر الفعلي</div>
+          <div class="leg"><div class="leg-line" style="background:var(--cyan)"></div>التوقع</div>
+          <div class="leg"><div class="leg-line" style="background:var(--green)"></div>الهدف</div>
+          <div class="leg"><div class="leg-line" style="background:var(--red)"></div>الوقف</div>
+          <div class="leg"><div class="leg-line" style="background:rgba(0,230,118,.3);width:14px;height:8px;border-radius:2px"></div>منطقة الدخول</div>
+        </div>
+      </div>
+
+      <!-- FORECAST + ENTRY -->
+      <div class="g2">
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">🔮 توقعات الأسعار</div>
+          <div class="forecast-card" id="fc-panel">
+            <div class="forecast-title">أهداف متعددة + مستوى الثقة</div>
+            <div id="fc-rows"></div>
+          </div>
+          <div style="margin-top:10px">
+            <div style="font-size:8px;color:var(--tx3);margin-bottom:7px;font-weight:600">🎯 سيناريوهات الحركة</div>
+            <div id="scenarios"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">📍 مناطق الدخول + المستويات</div>
+          <div id="entry-zones"></div>
+          <div style="margin-top:10px">
+            <div style="font-size:8px;color:var(--tx3);margin-bottom:7px;font-weight:600">📐 المستويات المفتاحية</div>
+            <div id="klevels"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ SIGNALS ══════════ -->
+    <div class="sec" id="sec-signals">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🎯 الإشارات النشطة — 15 سهم</div>
+      <div class="card mb14">
+        <div class="card-stripe"></div>
+        <div class="card-title">📋 جدول الإشارات الكامل</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="sig-tbl"><thead><tr><th>الرمز</th><th>السلوك</th><th>الدخول</th><th>الهدف</th><th>الوقف</th><th>R:R</th><th>القوة</th><th>المرحلة</th></tr></thead>
+          <tbody id="sig-tbody"></tbody></table>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">💰 تدفق الأوبشن الكبير</div>
+          <div class="flow-item"><div class="flow-badge fb-c">C</div><div style="flex:1"><div class="flow-tk">NVDA $150C Jul18</div><div class="flow-meta">IV 42% • 2,400 عقد<br>🟢 الحيتان يراهنون على الصعود</div></div><div class="flow-sz fs-b">$3.8M</div></div>
+          <div class="flow-item"><div class="flow-badge fb-p">P</div><div style="flex:1"><div class="flow-tk">SPY $470P Jul11</div><div class="flow-meta">IV 18% • 5,100 عقد<br>🔴 تحوط مؤسسي من الهبوط</div></div><div class="flow-sz fs-s">$2.1M</div></div>
+          <div class="flow-item"><div class="flow-badge fb-c">C</div><div style="flex:1"><div class="flow-tk">QQQ $495C Jul18</div><div class="flow-meta">IV 22% • 3,800 عقد<br>🟢 شراء مؤسسي على القطاع</div></div><div class="flow-sz fs-b">$5.2M</div></div>
+          <div class="flow-item"><div class="flow-badge fb-c">C</div><div style="flex:1"><div class="flow-tk">META $540C Aug15</div><div class="flow-meta">IV 31% • 2,100 عقد<br>🟢 تراكم قبل النتائج</div></div><div class="flow-sz fs-b">$4.7M</div></div>
+          <div class="flow-item"><div class="flow-badge fb-p">P</div><div style="flex:1"><div class="flow-tk">AAPL $205P Jul25</div><div class="flow-meta">IV 28% • 1,900 عقد<br>🔴 رهان على هبوط AAPL</div></div><div class="flow-sz fs-s">$1.6M</div></div>
+        </div>
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">😫 Max Pain + التأثير</div>
+          <div style="font-size:9px;color:var(--tx3);margin-bottom:9px;line-height:1.6">السعر الذي تنتهي عنده أكثر الأوبشن بلا قيمة — السوق يُجذب نحوه</div>
+          <div id="mp-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ WHALES ══════════ -->
+    <div class="sec" id="sec-whales">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🐋 تدفق الحيتان والمؤسسات</div>
+      <div class="g2 mb14">
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">🏦 مشتريات المؤسسات 13F</div>
+          <table class="sig-tbl"><thead><tr><th>المؤسسة</th><th>السهم</th><th>التغيير</th><th>السلوك</th></tr></thead><tbody>
+            <tr><td style="font-size:10px;font-weight:600">BlackRock</td><td><span class="tk">NVDA</span></td><td class="pn g">▲+$1.4B</td><td><div class="beh buy">🟢</div></td></tr>
+            <tr><td style="font-size:10px;font-weight:600">Vanguard</td><td><span class="tk">META</span></td><td class="pn g">▲+$1.1B</td><td><div class="beh buy">🟢</div></td></tr>
+            <tr><td style="font-size:10px;font-weight:600">Fidelity</td><td><span class="tk">GOOGL</span></td><td class="pn g">▲+$900M</td><td><div class="beh buy">🟢</div></td></tr>
+            <tr><td style="font-size:10px;font-weight:600">Citadel</td><td><span class="tk">AAPL</span></td><td class="pn r">▼-$400M</td><td><div class="beh sell">🔴</div></td></tr>
+            <tr><td style="font-size:10px;font-weight:600">Goldman</td><td><span class="tk">AMD</span></td><td class="pn g">▲+$600M</td><td><div class="beh buy">🟢</div></td></tr>
+            <tr><td style="font-size:10px;font-weight:600">ARK</td><td><span class="tk">COIN</span></td><td class="pn g">▲+$320M</td><td><div class="beh buy">🟢</div></td></tr>
+          </tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-stripe"></div>
+          <div class="card-title">🕵️ Spoofing — الأوامر الخادعة</div>
+          <table class="sig-tbl"><thead><tr><th>الرمز</th><th>النوع</th><th>الحجم</th><th>الهدف</th></tr></thead><tbody>
+            <tr><td><span class="tk">NVDA</span></td><td><div class="beh sell" style="font-size:9px">بيع وهمي</div></td><td class="pn n">850K</td><td style="font-size:8px;color:var(--gold)">شراء أرخص</td></tr>
+            <tr><td><span class="tk">QQQ</span></td><td><div class="beh buy" style="font-size:9px">شراء وهمي</div></td><td class="pn n">2.1M</td><td style="font-size:8px;color:var(--gold)">بيع أعلى</td></tr>
+            <tr><td><span class="tk">META</span></td><td><div class="beh sell" style="font-size:9px">بيع وهمي</div></td><td class="pn n">420K</td><td style="font-size:8px;color:var(--gold)">تفعيل Stop Loss</td></tr>
+          </tbody></table>
+          <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:8px;padding:10px;margin-top:10px;font-size:9px;color:var(--tx2);line-height:1.65">
+            <div style="color:var(--gold);font-weight:700;font-size:8px;margin-bottom:4px">⚠️ كيف تستفيد:</div>
+            بيع وهمي = شراء عند الهبوط المصطنع 🟢<br>شراء وهمي = احذر الدخول عند الارتفاع المصطنع 🔴
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ WYCKOFF ══════════ -->
+    <div class="sec" id="sec-wyckoff">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🔄 منهج Wyckoff الكامل</div>
+      <div class="wy-grid">
+        <div class="wy-card active" onclick="pickWy(this,'acc')"><div class="wy-en">ACCUMULATION</div><div class="wy-ar" style="color:var(--green)">التراكم 🟢</div><div class="wy-d">الحيتان يجمعون بهدوء</div></div>
+        <div class="wy-card" onclick="pickWy(this,'mup')"><div class="wy-en">MARKUP</div><div class="wy-ar" style="color:var(--cyan)">الارتفاع 🔵</div><div class="wy-d">الدفع للأعلى</div></div>
+        <div class="wy-card" onclick="pickWy(this,'dis')"><div class="wy-en">DISTRIBUTION</div><div class="wy-ar" style="color:var(--orange)">التوزيع 🟡</div><div class="wy-d">البيع على المتحمسين</div></div>
+        <div class="wy-card" onclick="pickWy(this,'mdn')"><div class="wy-en">MARKDOWN</div><div class="wy-ar" style="color:var(--red)">الانخفاض 🔴</div><div class="wy-d">الانهيار بعد التوزيع</div></div>
+      </div>
+      <div class="card mb10" id="wy-det" style="border-color:var(--gdim)">
+        <div class="card-stripe"></div>
+        <div id="wy-t" style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:8px"></div>
+        <div id="wy-b" style="font-size:11px;color:var(--tx2);line-height:1.85;white-space:pre-wrap"></div>
+      </div>
+      <div class="card">
+        <div class="card-stripe"></div>
+        <div class="card-title">📌 أحداث Wyckoff الرئيسية</div>
+        <div class="g2" style="gap:8px;margin-top:4px">
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px">PS — Preliminary Support 🟢</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">أول توقف بعد هبوط. الحيتان يبدأون الشراء بهدوء</div></div>
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px">SC — Selling Climax 🟢</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">ذعر كامل + حجم ضخم = الحيتان يمتصون البيع</div></div>
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--gold);margin-bottom:4px">Spring ⭐ أفضل دخول</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">كسر وهمي للقاع ثم عودة فورية = فرصة ذهبية</div></div>
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--cyan);margin-bottom:4px">SOS — Sign of Strength 🟢</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">كسر المقاومة بحجم قوي = تأكيد Markup</div></div>
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:4px">UT — Upthrust 🔴</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">كسر وهمي فوق المقاومة = بداية التوزيع</div></div>
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:11px"><div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:4px">BC — Buying Climax 🔴</div><div style="font-size:9px;color:var(--tx3);line-height:1.6">ارتفاع مفاجئ ضخم = الحيتان يبيعون على الجمهور</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PATTERNS ══════════ -->
+    <div class="sec" id="sec-patterns">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🎭 أنماط التلاعب — تعرف الفخاخ</div>
+      <div class="pat-card" style="border-right:3px solid var(--orange)"><div class="pat-name" style="color:var(--orange)">🪤 Stop Hunt <span class="pat-en">صيد وقف الخسارة</span></div><div class="pat-desc">يدفعون السعر أسفل دعم لتفعيل Stop Loss الصغار وشراء أسهمهم رخيصاً، ثم يعكسون الاتجاه فوراً.</div><div class="pat-tip" style="background:var(--gglow);color:var(--gold)">💡 ضع وقف الخسارة بهامش كافٍ أسفل الدعم — ليس عليه مباشرة.</div></div>
+      <div class="pat-card" style="border-right:3px solid var(--red)"><div class="pat-name" style="color:var(--red)">📉 Pump & Dump <span class="pat-en">الضخ والتفريغ</span></div><div class="pat-desc">يضخون أخباراً ويرفعون السعر، ثم يبيعون على الجمهور المتحمس ويختفون.</div><div class="pat-tip" style="background:rgba(255,69,96,.08);color:var(--red)">⚠️ سهم يصعد 50%+ في يوم بلا سبب = اهرب فوراً.</div></div>
+      <div class="pat-card" style="border-right:3px solid var(--purple)"><div class="pat-name" style="color:var(--purple)">👻 Spoofing <span class="pat-en">الأوامر الوهمية</span></div><div class="pat-desc">أوامر ضخمة تظهر في دفتر الطلبات لإيهام السوق، ثم تُسحب قبل التنفيذ.</div><div class="pat-tip" style="background:rgba(168,85,247,.07);color:var(--purple)">💡 أوامر ضخمة تختفي في ثوانٍ = Spoofing.</div></div>
+      <div class="pat-card" style="border-right:3px solid var(--cyan)"><div class="pat-name" style="color:var(--cyan)">🧊 Iceberg <span class="pat-en">الجبل الجليدي</span></div><div class="pat-desc">المؤسسات تُخفي 90% من أوامرها. مستوى دعم صلب لا يُكسر = طلب مؤسسي مخفي.</div><div class="pat-tip" style="background:rgba(0,212,255,.06);color:var(--cyan)">💡 دعم صلب غير عادي = تراكم Iceberg.</div></div>
+      <div class="pat-card" style="border-right:3px solid var(--green)"><div class="pat-name" style="color:var(--green)">🌊 Gamma Squeeze <span class="pat-en">ضغط جاما</span></div><div class="pat-desc">شراء Call Options يُجبر صانع السوق على شراء الأسهم → يرفع السعر → دوامة صاعدة.</div><div class="pat-tip" style="background:rgba(0,230,118,.06);color:var(--green)">💡 ارتفاع Open Interest في Calls = Squeeze محتمل.</div></div>
+    </div>
+
+    <!-- ══════════ ROADMAP ══════════ -->
+    <div class="sec" id="sec-roadmap">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🗺️ خارطة الطريق للاحتراف</div>
+      <div class="rm-phase rmp1">
+        <div class="rmp-header"><div><div class="rmp-sub">المرحلة الأولى</div><div class="rmp-name" style="color:var(--gold)">🏗️ بناء الأساس</div></div><div class="rmp-dur">3–6 أشهر</div></div>
+        <div class="checklist">
+          <div class="ck-item"><div class="ck-box checked" onclick="tc(this)">✓</div>القراءة الشمعدانية</div>
+          <div class="ck-item"><div class="ck-box checked" onclick="tc(this)">✓</div>نظرية داو</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>منهج Wyckoff</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>تحليل الحجم VSA</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>مستويات السيولة</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>تداول ورقي 30 يوم</div>
+        </div>
+      </div>
+      <div class="rm-phase rmp2">
+        <div class="rmp-header"><div><div class="rmp-sub">المرحلة الثانية</div><div class="rmp-name" style="color:var(--cyan)">⚙️ التعمق المهني</div></div><div class="rmp-dur">6–12 شهر</div></div>
+        <div class="checklist">
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>Order Flow + Level 2</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>الأوبشن والـ Greeks</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>Gamma/Delta/Max Pain</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>Dark Pools</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>تقارير 13F</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>Smart Money Concept</div>
+        </div>
+      </div>
+      <div class="rm-phase rmp3">
+        <div class="rmp-header"><div><div class="rmp-sub">المرحلة الثالثة</div><div class="rmp-name" style="color:var(--purple)">🏆 الاحتراف الكامل</div></div><div class="rmp-dur">12+ شهر</div></div>
+        <div class="checklist">
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>نظام تداول شخصي</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>إدارة مخاطر محكمة</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>Tape Reading</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>إدارة محفظة متعددة</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>ربط الكلي بالتقني</div>
+          <div class="ck-item"><div class="ck-box" onclick="tc(this)"></div>سجل تداول سنة</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ RULES ══════════ -->
+    <div class="sec" id="sec-rules">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">📜 القواعد الذهبية للمحترف</div>
+      <div class="card">
+        <div class="rule-item"><div class="rule-n">01</div><div><div class="rule-t">السوق دائماً على صواب</div><div class="rule-s">إذا كان الاتجاه عكس توقعك فالمشكلة في تحليلك — لا تعادِ السوق أبداً.</div></div></div>
+        <div class="rule-item"><div class="rule-n">02</div><div><div class="rule-t">إدارة المخاطر أهم من التوقع الصحيح</div><div class="rule-s">R:R 3:1 بنسبة 40% نجاح يتفوق على R:R 1:1 بنسبة 70%.</div></div></div>
+        <div class="rule-item"><div class="rule-n">03</div><div><div class="rule-t">لا تخاطر بأكثر من 1–2% لكل صفقة</div><div class="rule-s">10 خسائر بـ 2% = 18% قابلة للاسترداد. 10 بـ 10% = 65% مدمرة.</div></div></div>
+        <div class="rule-item"><div class="rule-n">04</div><div><div class="rule-t">الصبر سلاح الأقلية الرابحة</div><div class="rule-s">المحترف يمرر 90% من الإشارات وينتظر الـ 10% المثالية فقط.</div></div></div>
+        <div class="rule-item"><div class="rule-n">05</div><div><div class="rule-t">لا تحارب الأموال المؤسسية</div><div class="rule-s">إذا كانت الحيتان تبيع لا تكن أنت المشتري.</div></div></div>
+        <div class="rule-item"><div class="rule-n">06</div><div><div class="rule-t">التعرف على الفخ أهم من الفرصة</div><div class="rule-s">تجنب صفقة خاطئة يعادل ربح عشر صفقات صحيحة.</div></div></div>
+        <div class="rule-item" style="border-bottom:none"><div class="rule-n">07</div><div><div class="rule-t">سجّل كل صفقة ودرّسها</div><div class="rule-s">بعد 6 أشهر ستكتشف أنماطاً في أخطائك لم تعرفها من قبل.</div></div></div>
+      </div>
+    </div>
+
+    <!-- ══════════ AI ══════════ -->
+    <div class="sec" id="sec-ai">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">🤖 المحلل الذكي</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">تحليل من منظور Smart Money باللغة العربية</div>
+      <div class="card">
+        <div class="card-title">⚡ أسئلة سريعة</div>
+        <div class="ai-qp">
+          <div class="qp-btn" onclick="setQ('حلل NVDA: تراكم أم توزيع وما التوقعات؟')">🐋 NVDA</div>
+          <div class="qp-btn" onclick="setQ('أفضل استراتيجية أوبشن عند VIX فوق 20')">📊 VIX</div>
+          <div class="qp-btn" onclick="setQ('كيف أحدد Spring في Wyckoff وأدخل بدقة؟')">📈 Spring</div>
+          <div class="qp-btn" onclick="setQ('كيف أقرأ Level 2 وأجد Iceberg Orders؟')">📋 Level 2</div>
+          <div class="qp-btn" onclick="setQ('علامات Gamma Squeeze وكيف أستفيد منها؟')">⚡ Gamma</div>
+          <div class="qp-btn" onclick="setQ('كيف أحمي نفسي من Stop Hunt؟')">🛡️ Stop Hunt</div>
+          <div class="qp-btn" onclick="setQ('تحليل META من منظور Dark Pool')">🌑 META</div>
+          <div class="qp-btn" onclick="setQ('أفضل عقود الأوبشن للشراء الآن بناءً على تدفق الحيتان')">💰 أفضل عقود</div>
+        </div>
+        <div class="ai-row">
+          <input type="text" class="ai-input" id="ai-inp" placeholder="اسأل عن أي سهم أو استراتيجية..."/>
+          <button class="ai-send-btn" onclick="runAI()" id="ai-btn">تحليل ⚡</button>
+        </div>
+        <div class="ai-resp" id="ai-resp"></div>
+      </div>
+    </div>
+
+  </div><!-- /app-content -->
+
+  <!-- ─── BOTTOM NAV ─── -->
+  <nav class="app-nav">
+    <div class="nav-item active" onclick="goTo('dashboard')"><span class="nav-icon">📊</span><span class="nav-lbl">لوحة</span></div>
+    <div class="nav-item" onclick="goTo('livep')"><span class="nav-icon">💹</span><span class="nav-lbl">أسعار</span></div>
+    <div class="nav-item" onclick="goTo('charts')"><span class="nav-icon">📈</span><span class="nav-lbl">بيانات</span></div>
+    <div class="nav-item" onclick="goTo('signals')"><span class="nav-icon">🎯</span><span class="nav-lbl">إشارات</span></div>
+    <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
+    <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
+    <div class="nav-item" onclick="goTo('patterns')"><span class="nav-icon">🎭</span><span class="nav-lbl">أنماط</span></div>
+    <div class="nav-item" onclick="goTo('roadmap')"><span class="nav-icon">🗺️</span><span class="nav-lbl">طريق</span></div>
+    <div class="nav-item" onclick="goTo('rules')"><span class="nav-icon">📜</span><span class="nav-lbl">قواعد</span></div>
+    <div class="nav-item" onclick="goTo('ai')"><span class="nav-icon">🤖</span><span class="nav-lbl">ذكاء</span></div>
+  </nav>
+
+</div><!-- /app-shell -->
+
+<!-- ─── BOT ─── -->
+<div class="bot-panel" id="bot-panel">
+  <div class="bot-hdr">
+    <div class="bot-name">
+      🤖 Smart Money Bot
+      <div class="bot-status"><div class="live-dot"></div>نشط</div>
+    </div>
+    <button class="bot-close-btn" onclick="toggleBot()">✕</button>
+  </div>
+  <div class="bot-msgs" id="bot-msgs">
+    <div class="msg bot">مرحباً! أنا بوت Smart Money المتخصص في:<br><br>🎯 <strong>مناطق الدخول المثالية</strong><br>💰 <strong>أفضل العقود والأسهم</strong><br>📊 <strong>تحليل سلوك الحيتان</strong><br>⚡ <strong>الإشارات اللحظية</strong><br><br>اسألني أو اضغط "أفضل صفقة الآن"!</div>
+  </div>
+  <div class="bot-quick" id="bot-quick">
+    <div class="bq-btn" onclick="bsend('أفضل صفقة الآن')">🔥 أفضل صفقة</div>
+    <div class="bq-btn" onclick="bsend('أفضل عقد أوبشن للشراء')">💰 أفضل عقد</div>
+    <div class="bq-btn" onclick="bsend('مناطق الدخول على NVDA')">📍 دخول NVDA</div>
+    <div class="bq-btn" onclick="bsend('أي سهم تتراكمه الحيتان الآن؟')">🐋 تراكم الحيتان</div>
+    <div class="bq-btn" onclick="bsend('أفضل 3 أسهم للشراء الآن')">⭐ أفضل 3 أسهم</div>
+  </div>
+  <div class="bot-input-row">
+    <input type="text" class="bot-input" id="bot-inp" placeholder="اسأل البوت..."/>
+    <button class="bot-send-btn" onclick="bsend()">إرسال</button>
+  </div>
+</div>
+<button class="bot-fab" onclick="toggleBot()">🤖</button>
+
+<script>
+// ═══════════════════════ DATA ═══════════════════════
+const D = {
+  NVDA:{n:'NVIDIA',base:142.80,chg:2.4,beh:'buy',bl:'🟢 تراكم مؤسسي',rr:'3.4:1',wy:'Markup',pool:'68%',vol:'9.2x',target:158,stop:138,h:'3 أسابيع',
+    mom:{rsi:58.4,macd:2.14,sto:72.3,adx:31.2,bb:'وسط',ema:'صاعد',score:74},
+    entry:[{z:'⭐ الأمثل',p:'$138–$141',why:'دعم قوي + Dark Pool 68% + ذيول شمعدانية'},{z:'🛡️ محافظ',p:'$141–$144',why:'فوق الدعم المباشر بهامش أمان'}],
+    forecast:[{l:'الأسبوع',v:'$148',c:'h'},{l:'الشهر',v:'$155',c:'h'},{l:'3 أشهر',v:'$165',c:'m'},{l:'سيناريو صعودي',v:'$175',c:'h'},{l:'سيناريو هبوطي',v:'$135',c:'m'}],
+    levels:[{n:'هدف ١',v:'$150',c:'g'},{n:'هدف ٢',v:'$158',c:'g'},{n:'دعم',v:'$140',c:'n'},{n:'وقف الخسارة',v:'$138',c:'r'}]},
+  QQQ:{n:'NASDAQ ETF',base:480.20,chg:0.9,beh:'buy',bl:'🟢 شراء مؤسسي',rr:'2.8:1',wy:'Markup',pool:'71%',vol:'5.5x',target:495,stop:472,h:'2 أسابيع',
+    mom:{rsi:54.2,macd:1.82,sto:61.5,adx:27.4,bb:'وسط-أعلى',ema:'صاعد',score:68},
+    entry:[{z:'⭐ الأمثل',p:'$474–$477',why:'دعم EMA20 + Dark Pool 71%'},{z:'🛡️ محافظ',p:'$477–$481',why:'فوق مستوى الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$487',c:'h'},{l:'الشهر',v:'$492',c:'h'},{l:'3 أشهر',v:'$505',c:'m'},{l:'سيناريو صعودي',v:'$512',c:'m'},{l:'سيناريو هبوطي',v:'$468',c:'m'}],
+    levels:[{n:'هدف ١',v:'$490',c:'g'},{n:'هدف ٢',v:'$498',c:'g'},{n:'دعم',v:'$475',c:'n'},{n:'وقف',v:'$472',c:'r'}]},
+  AMD:{n:'Advanced Micro',base:158.30,chg:1.8,beh:'buy',bl:'🟢 تراكم',rr:'2.6:1',wy:'Late Acc',pool:'62%',vol:'5.5x',target:172,stop:152,h:'4 أسابيع',
+    mom:{rsi:52.1,macd:1.44,sto:55.8,adx:24.8,bb:'وسط',ema:'صاعد',score:62},
+    entry:[{z:'⭐ الأمثل',p:'$153–$156',why:'Spring منتظر + Goldman تتراكم'},{z:'🛡️ محافظ',p:'$156–$159',why:'فوق الدعم بهامش'}],
+    forecast:[{l:'الأسبوع',v:'$162',c:'m'},{l:'الشهر',v:'$168',c:'h'},{l:'3 أشهر',v:'$178',c:'m'},{l:'سيناريو صعودي',v:'$185',c:'m'},{l:'سيناريو هبوطي',v:'$148',c:'m'}],
+    levels:[{n:'هدف ١',v:'$168',c:'g'},{n:'هدف ٢',v:'$175',c:'g'},{n:'دعم',v:'$155',c:'n'},{n:'وقف',v:'$152',c:'r'}]},
+  AAPL:{n:'Apple Inc',base:211.50,chg:-0.7,beh:'sell',bl:'🔴 توزيع مؤسسي',rr:'3.3:1',wy:'Distribution',pool:'54%',vol:'6.5x',target:198,stop:215,h:'3 أسابيع',
+    mom:{rsi:44.8,macd:-1.22,sto:38.4,adx:28.6,bb:'أسفل',ema:'هابط',score:28},
+    entry:[{z:'🔴 بيع / Short',p:'$212–$214',why:'Upthrust + Citadel تبيع'},{z:'💰 Put Option',p:'$205 Strike Jul25',why:'رهان الحيتان على الهبوط'}],
+    forecast:[{l:'الأسبوع',v:'$208',c:'h'},{l:'الشهر',v:'$205',c:'h'},{l:'3 أشهر',v:'$198',c:'m'},{l:'سيناريو هبوطي',v:'$192',c:'m'},{l:'سيناريو صعودي',v:'$218',c:'l'}],
+    levels:[{n:'هدف هبوط ١',v:'$205',c:'r'},{n:'هدف هبوط ٢',v:'$198',c:'r'},{n:'مقاومة',v:'$214',c:'n'},{n:'وقف البيع',v:'$215',c:'r'}]},
+  COIN:{n:'Coinbase',base:225.00,chg:3.1,beh:'buy',bl:'🟢 شراء عدواني',rr:'2.6:1',wy:'Markup',pool:'66%',vol:'7.8x',target:248,stop:216,h:'2 أسابيع',
+    mom:{rsi:63.2,macd:3.18,sto:76.4,adx:35.8,bb:'أعلى',ema:'صاعد',score:78},
+    entry:[{z:'⭐ الأمثل',p:'$217–$221',why:'دعم + ARK تتراكم + BTC محفز'},{z:'🛡️ محافظ',p:'$221–$226',why:'فوق مستوى الدعم'}],
+    forecast:[{l:'الأسبوع',v:'$235',c:'h'},{l:'الشهر',v:'$242',c:'h'},{l:'3 أشهر',v:'$255',c:'m'},{l:'سيناريو صعودي',v:'$270',c:'m'},{l:'سيناريو هبوطي',v:'$210',c:'m'}],
+    levels:[{n:'هدف ١',v:'$238',c:'g'},{n:'هدف ٢',v:'$250',c:'g'},{n:'دعم',v:'$218',c:'n'},{n:'وقف',v:'$216',c:'r'}]},
+  TSLA:{n:'Tesla',base:248.10,chg:0.3,beh:'watch',bl:'👁 محايد — انتظر',rr:'2.1:1',wy:'Re-acc',pool:'49%',vol:'3.8x',target:275,stop:235,h:'5 أسابيع',
+    mom:{rsi:49.3,macd:0.42,sto:51.2,adx:18.4,bb:'وسط',ema:'محايد',score:48},
+    entry:[{z:'⏳ انتظار',p:'$240–$244',why:'ارتداد من الدعم بحجم قوي فقط'},{z:'📈 كسر صاعد',p:'فوق $258',why:'كسر $258 بحجم = دخول'}],
+    forecast:[{l:'الأسبوع',v:'$250',c:'m'},{l:'الشهر',v:'$258',c:'m'},{l:'3 أشهر',v:'$270',c:'m'},{l:'سيناريو صعودي',v:'$288',c:'l'},{l:'سيناريو هبوطي',v:'$232',c:'m'}],
+    levels:[{n:'هدف',v:'$272',c:'g'},{n:'مقاومة',v:'$258',c:'n'},{n:'دعم',v:'$240',c:'n'},{n:'وقف',v:'$235',c:'r'}]},
+  META:{n:'Meta Platforms',base:512.40,chg:1.6,beh:'buy',bl:'🟢 تراكم قوي',rr:'2.9:1',wy:'Markup',pool:'74%',vol:'8.0x',target:545,stop:495,h:'3 أسابيع',
+    mom:{rsi:61.8,macd:4.22,sto:68.4,adx:33.6,bb:'أعلى-وسط',ema:'صاعد',score:76},
+    entry:[{z:'⭐ الأمثل',p:'$496–$506',why:'دعم + Vanguard تتراكم + قبل النتائج'},{z:'🛡️ محافظ',p:'$506–$515',why:'فوق مستوى الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$524',c:'h'},{l:'الشهر',v:'$535',c:'h'},{l:'3 أشهر',v:'$548',c:'m'},{l:'سيناريو صعودي',v:'$560',c:'m'},{l:'سيناريو هبوطي',v:'$490',c:'m'}],
+    levels:[{n:'هدف ١',v:'$530',c:'g'},{n:'هدف ٢',v:'$548',c:'g'},{n:'دعم',v:'$500',c:'n'},{n:'وقف',v:'$495',c:'r'}]},
+  MSFT:{n:'Microsoft',base:415.20,chg:0.4,beh:'watch',bl:'👁 محايد — حذر',rr:'2.0:1',wy:'Re-acc',pool:'58%',vol:'3.2x',target:435,stop:405,h:'4 أسابيع',
+    mom:{rsi:51.2,macd:0.88,sto:53.4,adx:21.2,bb:'وسط',ema:'محايد',score:52},
+    entry:[{z:'⏳ انتظار',p:'$407–$411',why:'دعم تاريخي + JPM توقف البيع'},{z:'📈 كسر صاعد',p:'فوق $421',why:'كسر $420 بحجم = Markup'}],
+    forecast:[{l:'الأسبوع',v:'$418',c:'m'},{l:'الشهر',v:'$425',c:'m'},{l:'3 أشهر',v:'$434',c:'m'},{l:'سيناريو صعودي',v:'$445',c:'l'},{l:'سيناريو هبوطي',v:'$402',c:'m'}],
+    levels:[{n:'هدف',v:'$432',c:'g'},{n:'مقاومة',v:'$420',c:'n'},{n:'دعم',v:'$408',c:'n'},{n:'وقف',v:'$405',c:'r'}]},
+  GOOGL:{n:'Alphabet',base:172.30,chg:1.2,beh:'buy',bl:'🟢 شراء متراكم',rr:'2.3:1',wy:'Markup',pool:'63%',vol:'6.0x',target:188,stop:165,h:'4 أسابيع',
+    mom:{rsi:56.8,macd:1.98,sto:62.4,adx:29.4,bb:'وسط-أعلى',ema:'صاعد',score:66},
+    entry:[{z:'⭐ الأمثل',p:'$166–$169',why:'دعم EMA50 + Fidelity تتراكم'},{z:'🛡️ محافظ',p:'$169–$173',why:'فوق الدعم بهامش أمان'}],
+    forecast:[{l:'الأسبوع',v:'$176',c:'h'},{l:'الشهر',v:'$181',c:'h'},{l:'3 أشهر',v:'$188',c:'m'},{l:'سيناريو صعودي',v:'$195',c:'m'},{l:'سيناريو هبوطي',v:'$162',c:'m'}],
+    levels:[{n:'هدف ١',v:'$181',c:'g'},{n:'هدف ٢',v:'$190',c:'g'},{n:'دعم',v:'$168',c:'n'},{n:'وقف',v:'$165',c:'r'}]},
+  SPY:{n:'S&P 500 ETF',base:530.50,chg:0.8,beh:'buy',bl:'🟢 تدفق إيجابي',rr:'1.5:1',wy:'Markup',pool:'61%',vol:'4.2x',target:545,stop:520,h:'3 أسابيع',
+    mom:{rsi:53.4,macd:1.44,sto:58.8,adx:25.6,bb:'وسط',ema:'صاعد',score:60},
+    entry:[{z:'⭐ الأمثل',p:'$522–$526',why:'دعم Markup + تدفق مؤسسي إيجابي'},{z:'🛡️ محافظ',p:'$526–$532',why:'فوق الدعم المحلي'}],
+    forecast:[{l:'الأسبوع',v:'$535',c:'h'},{l:'الشهر',v:'$540',c:'m'},{l:'3 أشهر',v:'$548',c:'m'},{l:'سيناريو صعودي',v:'$558',c:'m'},{l:'سيناريو هبوطي',v:'$514',c:'m'}],
+    levels:[{n:'هدف',v:'$543',c:'g'},{n:'مقاومة',v:'$535',c:'n'},{n:'دعم',v:'$524',c:'n'},{n:'وقف',v:'$520',c:'r'}]},
+};
+
+// ═══════════════════════ LIVE PRICES ═══════════════════════
+const LP = {};
+Object.keys(D).forEach(t => { LP[t] = { p: D[t].base, pre: D[t].base*(1+(Math.random()-.5)*.009), aft: D[t].base*(1+(Math.random()-.5)*.013) }; });
+
+function getSess() {
+  const ny = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const t = ny.getHours()*60+ny.getMinutes(), d = ny.getDay();
+  if(d===0||d===6) return {id:'closed',lbl:'🔴 مغلق',cls:'sb-night'};
+  if(t>=240&&t<570)  return {id:'pre',lbl:'🌙 ما قبل الافتتاح',cls:'sb-pre'};
+  if(t>=570&&t<960)  return {id:'open',lbl:'✅ السوق مفتوح',cls:'sb-open'};
+  if(t>=960&&t<1200) return {id:'after',lbl:'🌆 ما بعد الإغلاق',cls:'sb-after'};
+  return {id:'night',lbl:'🌑 التداول الليلي',cls:'sb-night'};
+}
+
+function updSess() {
+  const s = getSess();
+  const b = document.getElementById('sbadge');
+  b.className = 'sess-badge '+s.cls; b.textContent = s.lbl;
+  const ny = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  document.getElementById('nyt').textContent = 'NY: '+ny.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit'});
+  const descs = {pre:'سيولة منخفضة — راقب فجوات الافتتاح',open:'أعلى سيولة — أفضل وقت للتنفيذ',after:'نتائج الشركات — تقلبات عالية',night:'أخبار دولية — سيولة منخفضة جداً',closed:'السوق مغلق — وقت التخطيط'};
+  const desc = document.getElementById('sdesc'); if(desc) desc.textContent = descs[s.id]||'';
+  ['pre','open','after','night'].forEach(id => { const c = document.getElementById('sc-'+id); if(c) c.classList.toggle('active-sess', id===s.id); });
+}
+
+function simP(t) {
+  const s = D[t]; const sess = getSess().id;
+  const v = sess==='open'?.0014:sess==='pre'||sess==='after'?.0007:.0003;
+  const dr = s.beh==='buy'?.00016:s.beh==='sell'?-.00016:0;
+  LP[t].p = Math.max(LP[t].p*(1+(Math.random()-.5)*v+dr), s.stop*.93);
+  LP[t].pre *= 1+(Math.random()-.5)*.0005;
+  LP[t].aft *= 1+(Math.random()-.5)*.0005;
+}
+
+function buildLPGrid() {
+  const el = document.getElementById('lp-grid'); if(!el) return;
+  const sess = getSess();
+  el.innerHTML = Object.keys(D).map(t => {
+    const s = D[t]; const lp = LP[t];
+    const ch = (lp.p-s.base)/s.base*100;
+    const cc = ch>=0?'var(--green)':'var(--red)';
+    const ext = sess.id==='pre'?lp.pre:lp.aft;
+    const ech = (ext-s.base)/s.base*100;
+    const el2 = sess.id==='pre'?'ما قبل':sess.id==='after'?'بعد إغلاق':sess.id==='night'?'ليلي':'—';
+    return `<div class="lpc" id="lpc-${t}">
+      <div class="lpc-name"><span>${t}</span><span style="font-size:7px;color:${sess.id==='open'?'var(--green)':sess.id==='pre'?'var(--purple)':'var(--orange)'}">${sess.id==='open'?'●':sess.id==='pre'?'◐':'◑'}</span></div>
+      <div class="lpc-price" style="color:${cc}" id="lpp-${t}">$${lp.p.toFixed(2)}</div>
+      <div class="lpc-chg" style="color:${cc}">${ch>=0?'+':''}${ch.toFixed(2)}%</div>
+      ${sess.id!=='open'?`<div class="lpc-ext">${el2}: <span style="color:${ech>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)} (${ech>=0?'+':''}${ech.toFixed(2)}%)</span></div>`:''}
+      <div class="lpc-beh"><div class="beh ${s.beh}" style="font-size:9px">${s.bl}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function buildPTable() {
+  const el = document.getElementById('ptbody'); if(!el) return;
+  const sess = getSess();
+  el.innerHTML = Object.entries(D).map(([t,s]) => {
+    const lp = LP[t];
+    const ch = (lp.p-s.base)/s.base*100;
+    const ext = sess.id==='pre'?lp.pre:lp.aft;
+    const ech = (ext-s.base)/s.base*100;
+    const sc = s.mom.score;
+    const mc = sc>65?'var(--green)':sc>40?'var(--orange)':'var(--red)';
+    return `<tr>
+      <td><span class="tk">${t}</span><div style="font-size:7px;color:var(--tx3)">${s.n}</div></td>
+      <td><div class="beh ${sess.id==='open'?'buy':'watch'}" style="font-size:8px">${sess.id==='open'?'✅':sess.id==='pre'?'🌙':sess.id==='after'?'🌆':'🌑'}</div></td>
+      <td><div class="pn ${ch>=0?'g':'r'}" id="tp-${t}">$${lp.p.toFixed(2)}</div><div style="font-size:7px;color:${ch>=0?'var(--green)':'var(--red)'}">${ch>=0?'+':''}${ch.toFixed(2)}%</div></td>
+      <td class="pn ${ch>=0?'g':'r'}">${ch>=0?'+':''}${ch.toFixed(2)}%</td>
+      <td style="font-size:9px;color:${ech>=0?'var(--green)':'var(--red)'}">$${ext.toFixed(2)}<div style="font-size:7px;color:var(--tx3)">${ech>=0?'+':''}${ech.toFixed(2)}%</div></td>
+      <td><div style="font-weight:700;font-size:9px;color:${mc}">${sc}%</div><div style="height:3px;background:var(--bd);border-radius:2px;margin-top:2px;width:48px"><div style="height:100%;width:${sc}%;background:${mc};border-radius:2px"></div></div></td>
+      <td><div class="beh ${s.beh}">${s.bl}</div></td>
+      <td style="font-size:8px;color:var(--tx3)">${s.wy}</td>
+      <td class="pn g">$${s.target}</td>
+      <td class="pn r">$${s.stop}</td>
+    </tr>`;
+  }).join('');
+  const u = document.getElementById('lup-time'); if(u) u.textContent = 'تحديث: '+new Date().toLocaleTimeString('ar');
+}
+
+function refreshPrices() { Object.keys(D).forEach(t=>simP(t)); buildLPGrid(); buildPTable(); }
+
+// ═══════════════════════ CHART ═══════════════════════
+let CI=null, CT='NVDA', CR='1W';
+
+function genH(base,pts,beh,v){
+  const d=[];let p=base*.88;const tr=beh==='buy'?1:beh==='sell'?-1:.2;
+  for(let i=0;i<pts;i++){p+=(Math.random()-.47)*v;p+=tr*base*.0009;if(i>pts*.65)p+=tr*base*.0013;d.push(+p.toFixed(2));}
+  return d;
+}
+function genF(last,tgt,stp,pts,beh){
+  const d=[];const g=(beh==='sell'?stp:tgt)-last;
+  for(let i=0;i<pts;i++){const t=(i+1)/pts;d.push(+(last+g*Math.pow(t,.65)+(Math.random()-.5)*Math.abs(g)*.13).toFixed(2));}
+  return d;
+}
+function genL(r){
+  const now=new Date();
+  const cfg={'1W':{c:38,s:4*3600000,f:d=>`${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:00`},'1M':{c:30,s:86400000,f:d=>`${d.getMonth()+1}/${d.getDate()}`},'3M':{c:45,s:172800000,f:d=>`${d.getMonth()+1}/${d.getDate()}`}};
+  const c=cfg[r]||cfg['1W'];
+  return Array.from({length:c.c+1},(_,i)=>c.f(new Date(now-(c.c-i)*c.s)));
+}
+
+function buildChart(t,r){
+  const s=D[t];const pts=r==='1W'?39:r==='1M'?31:46;const pp=Math.round(pts*.72);const fp=pts-pp;
+  const hist=genH(s.base,pp,s.beh,s.base*.004);
+  const fore=genF(hist[hist.length-1],s.target,s.stop,fp,s.beh);
+  const eMin=parseFloat(s.entry[0].p.split('–')[0].replace(/[$]/g,''));
+  const eMax=parseFloat((s.entry[0].p.split('–')[1]||String(eMin+3)).replace(/[$a-zA-Zءأ-ي ]/g,''))||eMin+3;
+  const act=[...hist,...Array(fp).fill(null)];
+  const far=[...Array(pp-1).fill(null),hist[pp-1],...fore];
+  const tgt=Array(pts).fill(s.beh==='sell'?s.stop:s.target);
+  const stp=Array(pts).fill(s.stop);
+  const ezTop=hist.map(p=>p>=eMin&&p<=eMax?eMax:null);
+  const ezBot=hist.map(p=>p>=eMin&&p<=eMax?eMin:null);
+  const ctx=document.getElementById('MC').getContext('2d');
+  if(CI) CI.destroy();
+  CI=new Chart(ctx,{type:'line',data:{labels:genL(r),datasets:[
+    {label:'السعر',data:act,borderColor:'#C9A84C',borderWidth:2.2,pointRadius:0,pointHoverRadius:3,tension:.4,fill:false,order:1},
+    {label:'التوقع',data:far,borderColor:'#00D4FF',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.4,fill:false,order:2},
+    {label:'الهدف',data:tgt,borderColor:s.beh==='sell'?'#FF4560':'#00E676',borderWidth:1.2,borderDash:[4,3],pointRadius:0,tension:0,fill:false,order:3},
+    {label:'الوقف',data:stp,borderColor:'#FF4560',borderWidth:1,borderDash:[3,3],pointRadius:0,tension:0,fill:false,order:4},
+    {label:'منطقة دخول',data:[...ezTop,...Array(fp).fill(null)],borderColor:'transparent',backgroundColor:'rgba(0,230,118,.07)',fill:{target:{value:eMin},above:'rgba(0,230,118,.09)',below:'transparent'},pointRadius:0,tension:0,order:5},
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#0F1822',borderColor:'#1C2D40',borderWidth:1,titleColor:'#D8E2EC',bodyColor:'#6B8090',padding:9}},
+    scales:{
+      x:{grid:{color:'rgba(28,45,64,.35)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8},maxTicksLimit:8}},
+      y:{grid:{color:'rgba(28,45,64,.28)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8,family:"'JetBrains Mono'"},callback:v=>`$${v.toFixed(0)}`},position:'right'}
+    },interaction:{mode:'index',intersect:false}}});
+}
+
+function updMom(t){
+  const m=D[t].mom;
+  const rc=m.rsi>70?'var(--red)':m.rsi>50?'var(--orange)':'var(--green)';
+  const rs=m.rsi>70?'تشبع ⚠️':m.rsi>50?'محايد':'ذروة بيع 🟢';
+  const mc=m.macd>0?'var(--green)':'var(--red)';
+  const sc=m.sto>80?'var(--red)':m.sto>50?'var(--orange)':'var(--green)';
+  const ss=m.sto>80?'تشبع ⚠️':m.sto>50?'محايد':'ذروة بيع 🟢';
+  const ac=m.adx>30?'var(--green)':m.adx>20?'var(--orange)':'var(--tx3)';
+  const ec=m.ema==='صاعد'?'var(--green)':m.ema==='هابط'?'var(--red)':'var(--orange)';
+  const total=m.score;const tc2=total>65?'var(--green)':total>40?'var(--orange)':'var(--red)';
+  const ts=total>65?'🟢 شراء':total>40?'🟡 محايد':'🔴 بيع';
+  const set=(id,v,c)=>{const e=document.getElementById(id);if(e){e.textContent=v;e.style.color=c;}};
+  set('m-rsi',m.rsi,rc);set('m-rsi-s',rs,rc);
+  set('m-macd',(m.macd>0?'+':'')+m.macd,mc);set('m-macd-s',m.macd>0?'🟢 صعودي':'🔴 هبوطي',mc);
+  set('m-sto',m.sto,sc);set('m-sto-s',ss,sc);
+  set('m-adx',m.adx,ac);set('m-adx-s',m.adx>30?'قوي':m.adx>20?'متوسط':'ضعيف',ac);
+  set('m-bb',m.bb,'var(--tx2)');set('m-bb-s','نطاق طبيعي','var(--tx3)');
+  set('m-ema','↑ '+m.ema,ec);set('m-ema-s',m.ema==='صاعد'?'Golden ✕':'محايد',ec);
+  set('m-vol',D[t].vol,'var(--cyan)');set('m-vol-s','غير طبيعي','var(--cyan)');
+  set('m-tot',total>65?'قوي':total>40?'محايد':'ضعيف',tc2);set('m-tot-s',ts,tc2);
+  const bar=document.getElementById('m-bar');
+  if(bar){bar.style.width=total+'%';bar.style.background=`linear-gradient(90deg,${tc2},${tc2}99)`;}
+}
+
+function selStock(t){
+  CT=t;const s=D[t];const lp=LP[t];
+  document.querySelectorAll('.stab').forEach(x=>x.classList.toggle('active',x.dataset.t===t));
+  document.getElementById('pr-name').textContent=`${t} — ${s.n}`;
+  const prEl=document.getElementById('pr-price');prEl.textContent=`$${lp.p.toFixed(2)}`;
+  const ch=(lp.p-s.base)/s.base*100;
+  const cEl=document.getElementById('pr-chg');cEl.textContent=(ch>=0?'▲ +':'▼ ')+ch.toFixed(2)+'%';cEl.className='pr-chg '+(ch>=0?'up':'dn');
+  document.getElementById('ch-title').textContent=`${t} — السعر + التوقع + مناطق الدخول`;
+  document.getElementById('pr-meta').textContent=`هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
+  const pb=document.getElementById('pr-beh');pb.textContent=s.bl;pb.className='beh '+s.beh;
+  const sess=getSess();const ps=document.getElementById('pr-sess');ps.className='sess-badge '+sess.cls;ps.textContent=sess.lbl;
+  updMom(t);
+  // Forecast rows
+  const bc={h:'badge-h',m:'badge-m',l:'badge-l'};const bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
+  const fcColor=s.beh==='sell'?'var(--red)':'var(--green)';
+  document.getElementById('fc-rows').innerHTML=s.forecast.map(f=>`
+    <div class="fc-row"><div class="fc-lbl">${f.l}</div><div style="display:flex;align-items:center;gap:6px"><div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcColor}">${f.v}</div><div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div></div></div>`).join('');
+  // Scenarios
+  document.getElementById('scenarios').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px"><span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px"><span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px"><span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span></div>
+    </div>`;
+  // Entry zones
+  const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
+  const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
+  const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
+  document.getElementById('entry-zones').innerHTML=s.entry.map(e=>`
+    <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
+      <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
+      <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
+      <div class="ez-why">${e.why}</div>
+    </div>`).join('');
+  // Key levels
+  const kc={g:'var(--green)',r:'var(--red)',n:'var(--tx2)'};
+  document.getElementById('klevels').innerHTML=s.levels.map(l=>`
+    <div class="klev" style="border-right:3px solid ${kc[l.c]||'var(--tx3)'}">
+      <div class="klev-lbl">${l.n}</div>
+      <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div>
+    </div>`).join('');
+  buildChart(t,CR);
+}
+
+function sRange(r){
+  CR=r;
+  document.querySelectorAll('.chart-btn').forEach(b=>b.classList.toggle('active',b.textContent===r));
+  buildChart(CT,CR);
+}
+
+// Build tabs
+const ctabs=document.getElementById('ctabs');
+Object.keys(D).forEach(t=>{
+  const b=document.createElement('button');
+  b.className='stab'+(t==='NVDA'?' active':'');
+  b.dataset.t=t;b.textContent=t;
+  b.onclick=()=>selStock(t);
+  ctabs.appendChild(b);
+});
+
+// ═══ SIGNALS TABLE ═══
+function buildSig(){
+  document.getElementById('sig-tbody').innerHTML=Object.entries(D).map(([t,s])=>`
+    <tr><td><span class="tk">${t}</span></td>
+    <td><div class="beh ${s.beh}">${s.bl}</div></td>
+    <td class="pn n">$${s.base}</td><td class="pn g">$${s.target}</td><td class="pn r">$${s.stop}</td>
+    <td class="pn n">${s.rr}</td>
+    <td><div class="sdots">${[1,2,3,4,5].map(i=>`<div class="sd${parseFloat(s.rr)>=(i*.55+1.1)?' on':''}"></div>`).join('')}</div></td>
+    <td style="font-size:9px;color:var(--tx3)">${s.wy}</td></tr>`).join('');
+}
+
+// ═══ MAX PAIN ═══
+function buildMP(){
+  const mp={QQQ:'$478',NVDA:'$140',SPY:'$530',META:'$510',GOOGL:'$170',AMD:'$155',AAPL:'$208'};
+  document.getElementById('mp-list').innerHTML=Object.entries(mp).map(([t,p])=>{
+    const cur=LP[t].p,mv=parseFloat(p.replace('$',''));
+    const diff=cur-mv;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(28,45,64,.4)">
+      <span class="tk">${t}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--orange)">${p}</span>
+      <span style="font-size:8px;color:var(--tx3)">${diff>0?`↓ ${diff.toFixed(0)}$ ضغط`:`↑ ${Math.abs(diff).toFixed(0)}$ دفع`}</span>
+    </div>`;}).join('');
+}
+
+// ═══ WYCKOFF ═══
+const WD={
+  acc:{t:'📥 التراكم — Accumulation 🟢',b:`السلوك = شراء مؤسسي مخفي 🟢\n\nالحيتان يشترون بهدوء بعد هبوط حاد. سعر في نطاق ضيق.\n\nعلامات:\n• حجم مرتفع فقط عند القيعان\n• فشل متكرر في كسر القاع\n• ذيول شمعدانية طويلة\n\nأفضل دخول: Spring (الكسر الوهمي ثم العودة)`},
+  mup:{t:'📈 الارتفاع — Markup 🔵',b:`السلوك = شراء + جمهور يدخل متأخراً 🔵\n\nالحيتان يدفعون السعر للأعلى. الجمهور يلاحق.\n\nعلامات:\n• كسر المقاومة بحجم قوي (SOS)\n• تصحيحات خفيفة\n• قيعان أعلى باستمرار\n\n⚠️ الدخول المتأخر = اقتراب من التوزيع`},
+  dis:{t:'📤 التوزيع — Distribution 🟡',b:`السلوك = بيع مؤسسي مخفي 🔴\n\nالحيتان يبيعون على المتحمسين.\n\nعلامات:\n• Upthrust: كسر وهمي فوق المقاومة ثم رجوع\n• حجم مرتفع عند القمم\n• أخبار إيجابية كثيرة\n\nهذا وقت البيع — ليس الشراء!`},
+  mdn:{t:'📉 الانخفاض — Markdown 🔴',b:`السلوك = بيع ذعر 🔴\n\nالانهيار بعد التوزيع.\n\nعلامات:\n• كسر قاع التوزيع بحجم ضخم\n• Selling Climax: هبوط مفاجئ حاد\n• أخبار سلبية متتالية\n\nفرصة: انتظر SC ثم ابحث عن التراكم الجديد 🎯`}
+};
+function pickWy(el,k){document.querySelectorAll('.wy-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('wy-t').textContent=WD[k].t;document.getElementById('wy-b').textContent=WD[k].b;}
+
+// ═══ NAVIGATION ═══
+const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',whales:'تدفق الحيتان',wyckoff:'منهج Wyckoff',patterns:'أنماط التلاعب',roadmap:'خارطة الطريق',rules:'القواعد الذهبية',ai:'المحلل الذكي'};
+const navOrder=['dashboard','livep','charts','signals','whales','wyckoff','patterns','roadmap','rules','ai'];
+
+function goTo(id){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.getElementById('sec-title').textContent=SM[id]||id;
+  const idx=navOrder.indexOf(id);
+  const items=document.querySelectorAll('.nav-item');
+  if(items[idx]) items[idx].classList.add('active');
+  document.getElementById('app-content').scrollTop=0;
+  if(id==='charts'&&!CI) setTimeout(()=>selStock('NVDA'),60);
+  if(id==='livep'){ buildLPGrid(); buildPTable(); }
+}
+
+// ═══ BOT ═══
+let botOpen=false;
+function toggleBot(){
+  botOpen=!botOpen;
+  document.getElementById('bot-panel').classList.toggle('open',botOpen);
+}
+
+async function bsend(msg){
+  const inp=document.getElementById('bot-inp');
+  const q=msg||inp.value.trim(); if(!q) return;
+  inp.value='';
+  const msgs=document.getElementById('bot-msgs');
+  msgs.innerHTML+=`<div class="msg user">${q}</div>`;
+  msgs.innerHTML+=`<div class="msg bot" id="bld" style="color:var(--tx3)"><div class="ald"><span></span><span></span><span></span></div></div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  const topBuys=Object.entries(D).filter(([,s])=>s.beh==='buy').sort((a,b)=>b[1].mom.score-a[1].mom.score).slice(0,3).map(([t,s])=>`${t}(زخم:${s.mom.score}%,هدف:$${s.target},R:R:${s.rr})`).join(' | ');
+  const sess=getSess();
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,
+        system:`أنت Smart Money Bot متخصص في: مناطق الدخول المثالية، أفضل العقود والأسهم، تحليل الحيتان.\nالبيانات الحالية:\n- أفضل أسهم: ${topBuys}\n- أفضل عقود: NVDA $150C Jul18 ($3.8M) | QQQ $495C Jul18 ($5.2M) | META $540C Aug15 ($4.7M)\n- جلسة: ${sess.lbl} | Fear&Greed: 62 جشع\nأجب بالعربية. كن محدداً: اذكر منطقة الدخول والهدف والوقف. لا تحفظات مطولة.`,
+        messages:[{role:"user",content:q}]})});
+    const data=await r.json();
+    const text=data.content?.map(b=>b.text||'').join('')||'خطأ';
+    const ld=document.getElementById('bld');
+    if(ld){ld.style.color='';ld.innerHTML=text.replace(/\n/g,'<br>');}
+  }catch(e){
+    const ld=document.getElementById('bld');if(ld){ld.style.color='var(--red)';ld.textContent='⚠️ خطأ في الاتصال.';}
+  }
+  msgs.scrollTop=msgs.scrollHeight;
+}
+document.getElementById('bot-inp').addEventListener('keypress',e=>{if(e.key==='Enter')bsend();});
+
+// ═══ AI SECTION ═══
+function setQ(t){document.getElementById('ai-inp').value=t;}
+async function runAI(){
+  const btn=document.getElementById('ai-btn');const resp=document.getElementById('ai-resp');
+  const q=document.getElementById('ai-inp').value.trim(); if(!q) return;
+  btn.disabled=true;btn.textContent='جارٍ...';
+  resp.style.display='flex';resp.className='ai-resp loading';
+  resp.innerHTML='<div>تحليل Smart Money</div><div class="ald"><span></span><span></span><span></span></div>';
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:900,
+        system:`خبير أسواق مالية 15 سنة — Wyckoff، Dark Pools، Options Flow، Smart Money. أجب بالعربية. وضّح السلوك: شراء 🟢 أم بيع 🔴. كن محدداً وعملياً.`,
+        messages:[{role:"user",content:q}]})});
+    const d=await r.json();const t=d.content?.map(b=>b.text||'').join('')||'خطأ';
+    resp.style.display='block';resp.className='ai-resp';resp.textContent=t;
+  }catch(e){resp.style.display='block';resp.className='ai-resp';resp.textContent='⚠️ خطأ في الاتصال.';}
+  btn.disabled=false;btn.textContent='تحليل ⚡';
+}
+document.getElementById('ai-inp').addEventListener('keypress',e=>{if(e.key==='Enter')runAI();});
+
+// ═══ CHECKBOX ═══
+function tc(el){el.classList.toggle('checked');el.textContent=el.classList.contains('checked')?'✓':'';}
+
+// ═══ CLOCK ═══
+function tick(){
+  document.getElementById('clk').textContent=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  updSess();
+}
+setInterval(tick,1000); tick();
+
+// ═══ PRICE SIM ═══
+setInterval(()=>{
+  Object.keys(D).forEach(t=>simP(t));
+  const lp=document.getElementById('sec-livep');
+  if(lp?.classList.contains('active')){buildLPGrid();buildPTable();}
+  if(CI){
+    const p=LP[CT].p;const el=document.getElementById('pr-price');
+    if(el){el.textContent=`$${p.toFixed(2)}`;el.classList.add('pflash');setTimeout(()=>el.classList.remove('pflash'),350);}
+  }
+},4000);
+
+// ═══ INIT ═══
+pickWy(document.querySelector('.wy-card'),'acc');
+buildSig(); buildMP(); updSess();
+</script>
+</body>
+</html>
