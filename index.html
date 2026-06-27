@@ -1452,20 +1452,7 @@ async function refreshPrices() {
   buildPTable();
 }
 
-// ═══════════════════════ TRADINGVIEW ═══════════════════════
-let tvWidget = null;
-let CT = 'NVDA';
-let tvInterval = '1D';
-
-const TV_MAP = {
-  NVDA:'NASDAQ:NVDA', QQQ:'NASDAQ:QQQ', AMD:'NASDAQ:AMD',
-  AAPL:'NASDAQ:AAPL', COIN:'NASDAQ:COIN', TSLA:'NASDAQ:TSLA',
-  META:'NASDAQ:META', MSFT:'NASDAQ:MSFT', GOOGL:'NASDAQ:GOOGL',
-  SPY:'AMEX:SPY',
-};
-
-// خريطة الأطر الزمنية
-
+// ═══════════════════════ CHART.JS ═══════════════════════
 let CI=null, CT='NVDA', CR='1W';
 const HCACHE={};
 
