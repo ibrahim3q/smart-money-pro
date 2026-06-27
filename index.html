@@ -1497,107 +1497,32 @@ async function refreshPrices() {
 }
 
 // ═══════════════════════ TRADINGVIEW ═══════════════════════
-let tvWidget = null;
+// ═══ متغيرات الشارت ═══
 let CT = 'NVDA';
-let tvInterval = '1D';
-let tvRange = '1M';
-
-// خريطة رموز TradingView
-const TV_MAP = {
-  NVDA:'NASDAQ:NVDA', QQQ:'NASDAQ:QQQ', AMD:'NASDAQ:AMD',
-  AAPL:'NASDAQ:AAPL', COIN:'NASDAQ:COIN', TSLA:'NASDAQ:TSLA',
-  META:'NASDAQ:META', MSFT:'NASDAQ:MSFT', GOOGL:'NASDAQ:GOOGL',
-  SPY:'AMEX:SPY',
-};
-
-// خريطة الأطر الزمنية
-const TV_RANGE_MAP = {
-  '1W': { interval:'60',  range:'5D'  },
-  '1M': { interval:'D',   range:'1M'  },
-  '3M': { interval:'D',   range:'3M'  },
-  '1D': { interval:'5',   range:'1D'  },
-};
-
-function buildTVWidget(ticker, intervalCode, rangeCode) {
-  const container = document.getElementById('tv-widget');
-  if(!container) return;
-  container.innerHTML = '';
-
-  const s = D[ticker];
-
-  new TradingView.widget({
-    autosize:       true,
-    symbol:         TV_MAP[ticker] || `NASDAQ:${ticker}`,
-    interval:       intervalCode || 'D',
-    range:          rangeCode    || '1M',
-    timezone:       'America/New_York',
-    theme:          'dark',
-    style:          '1',
-    locale:         'ar',
-    toolbar_bg:     '#0A0F18',
-    enable_publishing: false,
-    hide_top_toolbar:  false,
-    hide_legend:       false,
-    save_image:        false,
-    container_id:   'tv-widget',
-    backgroundColor: '#05080D',
-    gridColor:      'rgba(28,45,64,0.4)',
-    // مؤشرات مدمجة
-    studies: [
-      'RSI@tv-basicstudies',
-      'MACD@tv-basicstudies',
-      'Volume@tv-basicstudies',
-    ],
-    // خطوط مستوى الهدف والوقف
-    studies_overrides: {},
-    overrides: {
-      'mainSeriesProperties.candleStyle.upColor':       '#00E676',
-      'mainSeriesProperties.candleStyle.downColor':     '#FF4560',
-      'mainSeriesProperties.candleStyle.borderUpColor': '#00E676',
-      'mainSeriesProperties.candleStyle.borderDownColor':'#FF4560',
-      'mainSeriesProperties.candleStyle.wickUpColor':   '#00E676',
-      'mainSeriesProperties.candleStyle.wickDownColor': '#FF4560',
-      'paneProperties.background':                      '#05080D',
-      'paneProperties.vertGridProperties.color':        'rgba(28,45,64,0.3)',
-      'paneProperties.horzGridProperties.color':        'rgba(28,45,64,0.3)',
-      'scalesProperties.textColor':                     '#6B8090',
-    },
-    width:  '100%',
-    height: 380,
-  });
-}
-
-function setTV(interval, range) {
-  // تحديث أزرار الإطار الزمني
-  document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  const cfg = TV_RANGE_MAP[range] || TV_RANGE_MAP['1M'];
-  buildTVWidget(CT, cfg.interval, cfg.range);
-}
+let CR = '1W';
+const HCACHE = {};
 
 function selStock(t) {
   CT = t;
   const s = D[t];
   const lp = LP[t];
+  const lv = calcLevels(t);
 
   // تحديث تبويبات الأسهم
   document.querySelectorAll('.stab').forEach(x => x.classList.toggle('active', x.dataset.t===t));
 
   // تحديث صف السعر
-  document.getElementById('pr-name').textContent  = `${t} — ${s.n}`;
   const p   = lp.p || s.base;
   const pct = lp.chgPct || 0;
-  const amt = lp.chgAmt || 0;
+  document.getElementById('pr-name').textContent  = `${t} — ${s.n}`;
   document.getElementById('pr-price').textContent = `$${p.toFixed(2)}`;
   const cel = document.getElementById('pr-chg');
-  cel.textContent = (pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';
+  cel.textContent = (pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';
   cel.className   = 'pr-chg '+(pct>=0?'up':'dn');
-
-  document.getElementById('ch-title').textContent  = `${t} — بيانات حقيقية من TradingView`;
-  document.getElementById('pr-meta').textContent   = `هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
+  document.getElementById('ch-title').textContent = `${t} — السعر + التوقع`;
+  document.getElementById('pr-meta').textContent  = `هدف: $${lv.target} | وقف: $${lv.stop} | R:R ${lv.rr}`;
   const pb = document.getElementById('pr-beh');
   pb.textContent = s.bl; pb.className = 'beh '+s.beh;
-
   const sess = getSess();
   const ps = document.getElementById('pr-sess');
   if(ps){ ps.className='sess-badge '+sess.cls; ps.textContent=sess.lbl; }
@@ -1605,20 +1530,26 @@ function selStock(t) {
   // تحديث الزخم
   updMom(t);
 
-  // بناء TradingView
-  const cfg = TV_RANGE_MAP[tvRange] || TV_RANGE_MAP['1M'];
-  buildTVWidget(t, cfg.interval, cfg.range);
+  // بناء الرسم البياني
+  buildChart(t, CR);
 
-  // توقعات الأسعار
+  // توقعات ديناميكية
   const bc={h:'badge-h',m:'badge-m',l:'badge-l'};
   const bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
-  const fcColor = s.beh==='sell'?'var(--red)':'var(--green)';
-  document.getElementById('fc-rows').innerHTML = s.forecast.map(f=>`
+  const fcC = s.beh==='sell'?'var(--red)':'var(--green)';
+  const forecasts=[
+    {l:'الأسبوع',v:`$${lv.wk1}`,c:'h'},
+    {l:'الشهر',v:`$${lv.mo1}`,c:'h'},
+    {l:'3 أشهر',v:`$${lv.mo3}`,c:'m'},
+    {l:'سيناريو صعودي',v:`$${lv.bull}`,c:'m'},
+    {l:'سيناريو هبوطي',v:`$${lv.bear}`,c:'m'},
+  ];
+  document.getElementById('fc-rows').innerHTML = forecasts.map(f=>`
     <div class="fc-row">
       <div class="fc-lbl">${f.l}</div>
       <div style="display:flex;align-items:center;gap:6px">
-        <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcColor}">${f.v}</div>
-        <div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div>
+        <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcC}">${f.v}</div>
+        <div class="fc-badge ${bc[f.c]}">${bv[f.c]}</div>
       </div>
     </div>`).join('');
 
@@ -1627,37 +1558,159 @@ function selStock(t) {
     <div style="display:flex;flex-direction:column;gap:5px">
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${lv.mo1}→$${lv.bull}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${+(p*.99).toFixed(0)}→$${+(p*1.03).toFixed(0)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${lv.stop}→$${+(lv.stop*.95).toFixed(0)}</span>
       </div>
     </div>`;
 
-  // مناطق الدخول
+  // مناطق الدخول ديناميكية
   const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
   const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
   const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
-  document.getElementById('entry-zones').innerHTML = s.entry.map(e=>`
+  document.getElementById('entry-zones').innerHTML = [
+    {z:'⭐ الأمثل', p:`$${lv.e1Lo}–$${lv.e1Hi}`, why:s.entry?.[0]?.why||'منطقة دعم + مؤشرات مواتية'},
+    {z:'🛡️ محافظ',  p:`$${+(p*(s.beh==='sell'?1.005:0.995)).toFixed(2)}–$${+(p*(s.beh==='sell'?1.012:1.008)).toFixed(2)}`, why:s.entry?.[1]?.why||'فوق الدعم بهامش أمان'},
+  ].map(e=>`
     <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
       <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
       <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
       <div class="ez-why">${e.why}</div>
     </div>`).join('');
 
-  // مستويات مفتاحية
+  // مستويات مفتاحية ديناميكية
   const kc={g:'var(--green)',r:'var(--red)',n:'var(--tx2)'};
-  document.getElementById('klevels').innerHTML = s.levels.map(l=>`
+  const levels = s.beh==='sell'
+    ? [{n:'هدف هبوط ١',v:`$${lv.wk1}`,c:'r'},{n:'هدف هبوط ٢',v:`$${lv.target}`,c:'r'},{n:'مقاومة',v:`$${+(p*1.015).toFixed(2)}`,c:'n'},{n:'وقف',v:`$${lv.stop}`,c:'r'}]
+    : [{n:'هدف ١',v:`$${lv.wk1}`,c:'g'},{n:'هدف ٢',v:`$${lv.target}`,c:'g'},{n:'دعم',v:`$${lv.e1Lo}`,c:'n'},{n:'وقف',v:`$${lv.stop}`,c:'r'}];
+  document.getElementById('klevels').innerHTML = levels.map(l=>`
     <div class="klev" style="border-right:3px solid ${kc[l.c]||'var(--tx3)'}">
       <div class="klev-lbl">${l.n}</div>
       <div class="klev-val" style="color:${kc[l.c]||'var(--tx)'}">${l.v}</div>
     </div>`).join('');
 }
+
+// ═══ CHART.JS — رسم بياني حقيقي ═══
+let CI=null, CT='NVDA', CR='1W';
+const HCACHE={};
+
+async function buildChart(ticker, range) {
+  const s   = D[ticker];
+  const lv  = calcLevels(ticker);
+  const ctx = document.getElementById('MC');
+  if(!ctx) return;
+
+  let labels=[], actData=[], foreData=[];
+
+  // جرب جلب البيانات التاريخية الحقيقية
+  const ckey = ticker+'_'+range;
+  if(!HCACHE[ckey]) {
+    try {
+      const res  = await fetch(`/api/prices?type=history&ticker=${ticker}&range=${range}`);
+      const data = await res.json();
+      if(data.results?.length > 1) HCACHE[ckey] = data.results;
+    } catch(e) {}
+  }
+
+  const hist = HCACHE[ckey];
+
+  if(hist && hist.length > 1) {
+    // ── بيانات حقيقية ──
+    const fmt = range==='1D'
+      ? d=>{ const dt=new Date(d); return `${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`; }
+      : d=>{ const dt=new Date(d); return `${dt.getMonth()+1}/${dt.getDate()}`; };
+
+    labels  = hist.map(b=>fmt(b.t));
+    actData = hist.map(b=>+b.c.toFixed(2));
+
+    const lastP  = actData[actData.length-1];
+    const goal   = (s.beh==='sell'?lv.stop:lv.target) - lastP;
+    const fpts   = Math.max(5, Math.round(hist.length*.3));
+    const lastT  = hist[hist.length-1].t;
+    const step   = range==='1D'?300000:range==='1W'?3600000:86400000;
+
+    for(let i=1;i<=fpts;i++) {
+      const t   = i/fpts;
+      const val = +(lastP + goal*Math.pow(t,.7) + (Math.random()-.5)*Math.abs(goal)*.06).toFixed(2);
+      const dt  = new Date(lastT + i*step);
+      labels.push(range==='1D'?`${dt.getHours()}:${String(dt.getMinutes()).padStart(2,'0')}`:`${dt.getMonth()+1}/${dt.getDate()}`);
+      actData.push(null);
+      foreData.push(val);
+    }
+    foreData = [...Array(actData.length-fpts-1).fill(null), lastP, ...foreData];
+
+    document.getElementById('ch-title').textContent = `${ticker} — بيانات حقيقية من Polygon`;
+
+  } else {
+    // ── Fallback: محاكاة ذكية ──
+    const pts  = range==='1D'?78:range==='1W'?42:range==='1M'?31:46;
+    const pp   = Math.round(pts*.72);
+    const fp   = pts-pp;
+    const base = LP[ticker]?.p || s.base;
+    const now  = new Date();
+    const step = range==='1D'?300000:range==='1W'?3600000:86400000;
+    const fmt  = range==='1D'
+      ? d=>`${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
+      : d=>`${d.getMonth()+1}/${d.getDate()}`;
+    const dir  = s.beh==='sell'?-1:s.beh==='watch'?.1:1;
+
+    let p = base*.91;
+    for(let i=pp;i>=0;i--) {
+      p += (Math.random()-.46)*base*.004 + dir*base*.0009;
+      p  = Math.max(p, lv.stop*.9);
+      actData.unshift(+p.toFixed(2));
+      labels.unshift(fmt(new Date(now-i*step)));
+    }
+
+    const lastP = actData[actData.length-1];
+    const goal  = (s.beh==='sell'?lv.stop:lv.target) - lastP;
+    foreData    = [...Array(pp).fill(null), lastP];
+    for(let i=1;i<=fp;i++) {
+      const t = i/fp;
+      foreData.push(+(lastP + goal*Math.pow(t,.7) + (Math.random()-.5)*Math.abs(goal)*.08).toFixed(2));
+      labels.push(fmt(new Date(now+i*step)));
+      actData.push(null);
+    }
+    document.getElementById('ch-title').textContent = `${ticker} — السعر + التوقع`;
+  }
+
+  // منطقة الدخول
+  const eMin = lv.e1Lo, eMax = lv.e1Hi;
+  const ezD  = actData.map(p=>p!==null&&p>=eMin&&p<=eMax?eMax:null);
+
+  if(CI) CI.destroy();
+  CI = new Chart(ctx.getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets:[
+      {label:'السعر',data:actData,borderColor:'#C9A84C',borderWidth:2.2,pointRadius:0,pointHoverRadius:3,tension:.35,fill:false,order:1},
+      {label:'التوقع',data:foreData,borderColor:'#00D4FF',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.4,fill:false,order:2},
+      {label:'الهدف',data:Array(labels.length).fill(s.beh==='sell'?lv.stop:lv.target),borderColor:s.beh==='sell'?'#FF4560':'#00E676',borderWidth:1.2,borderDash:[4,3],pointRadius:0,tension:0,fill:false,order:3},
+      {label:'الوقف',data:Array(labels.length).fill(lv.stop),borderColor:'#FF4560',borderWidth:1,borderDash:[3,3],pointRadius:0,tension:0,fill:false,order:4},
+      {label:'منطقة دخول',data:ezD,borderColor:'transparent',backgroundColor:'rgba(0,230,118,.07)',fill:{target:{value:eMin},above:'rgba(0,230,118,.09)',below:'transparent'},pointRadius:0,tension:0,order:5},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#0F1822',borderColor:'#1C2D40',borderWidth:1,titleColor:'#D8E2EC',bodyColor:'#6B8090',padding:9}},
+      scales:{
+        x:{grid:{color:'rgba(28,45,64,.35)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8},maxTicksLimit:10}},
+        y:{grid:{color:'rgba(28,45,64,.28)',drawBorder:false},ticks:{color:'#2E4255',font:{size:8,family:"'JetBrains Mono'"},callback:v=>`$${v.toFixed(0)}`},position:'right'}
+      },
+      interaction:{mode:'index',intersect:false}
+    }
+  });
+}
+
+function sRange(r) {
+  CR=r;
+  document.querySelectorAll('.chart-btn').forEach(b=>b.classList.toggle('active',b.textContent===r));
+  buildChart(CT,CR);
+}
+function setTV(i,r) { sRange({'1W':'1W','1M':'1M','3M':'3M','1D':'1D'}[r]||r); }
 
 function updMom(t){
   const m=D[t].mom;
@@ -1774,8 +1827,7 @@ function goTo(id){
   const items=document.querySelectorAll('.nav-item');
   if(items[idx]) items[idx].classList.add('active');
   document.getElementById('app-content').scrollTop=0;
-  if(id==='charts'&&!CI) setTimeout(()=>selStock('NVDA'),80);
-  else if(id==='charts') setTimeout(()=>buildTVWidget(CT, '1D', '1M'), 80);
+  if(id==='charts') setTimeout(()=>selStock(CT||'NVDA'), 100);
   if(id==='livep'){ buildLPGrid(); buildPTable(); }
 }
 
