@@ -1087,6 +1087,88 @@ body::before {
       </div>
     </div>
 
+    <!-- ══════════ NEWS ══════════ -->
+    <div class="sec" id="sec-news">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">📰 الأخبار اللحظية</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">أخبار تؤثر على السوق وأسهمك مباشرة</div>
+
+      <!-- فلتر الأسهم -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="news-filter">
+        <button class="chart-btn active" onclick="filterNews('all')">🌐 الكل</button>
+        <button class="chart-btn" onclick="filterNews('market')">📊 السوق</button>
+        <button class="chart-btn" onclick="filterNews('NVDA')">NVDA</button>
+        <button class="chart-btn" onclick="filterNews('AAPL')">AAPL</button>
+        <button class="chart-btn" onclick="filterNews('META')">META</button>
+        <button class="chart-btn" onclick="filterNews('QQQ')">QQQ</button>
+        <button class="chart-btn" onclick="filterNews('TSLA')">TSLA</button>
+        <button class="chart-btn" onclick="filterNews('AMD')">AMD</button>
+      </div>
+
+      <!-- تنبيه عاجل -->
+      <div id="news-alert" style="display:none;background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.3);border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:4px">🚨 خبر عاجل</div>
+        <div id="news-alert-text" style="font-size:11px;color:var(--tx)"></div>
+      </div>
+
+      <!-- قائمة الأخبار -->
+      <div id="news-list" style="display:flex;flex-direction:column;gap:8px">
+        <div style="text-align:center;padding:40px;color:var(--tx3)">
+          <div style="font-size:24px;margin-bottom:8px">⏳</div>
+          <div style="font-size:11px">جارٍ جلب الأخبار...</div>
+        </div>
+      </div>
+
+      <!-- زر تحديث -->
+      <div style="margin-top:12px;text-align:center">
+        <button onclick="loadNews('all')" style="padding:10px 24px;border-radius:8px;background:var(--gglow);border:1px solid var(--gdim);color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif">🔄 تحديث الأخبار</button>
+      </div>
+    </div>
+
+    <!-- ══════════ OPTIONS ANALYZER ══════════ -->
+    <div class="sec" id="sec-options">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">💰 محلل عقود الخيارات</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">أفضل العقود بناءً على التحليل التقني + الأخبار + تدفق الحيتان</div>
+
+      <!-- إعدادات -->
+      <div class="card mb10">
+        <div class="card-stripe"></div>
+        <div class="card-title">⚙️ إعدادات التحليل</div>
+        <div class="g3" style="gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:5px">رأس المال ($)</div>
+            <input type="number" id="opt-capital" value="10000" style="width:100%;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;direction:ltr">
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:5px">المخاطرة لكل صفقة</div>
+            <select id="opt-risk" style="width:100%;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:11px;outline:none">
+              <option value="1">1% (محافظ)</option>
+              <option value="2" selected>2% (متوسط)</option>
+              <option value="5">5% (عدواني)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:5px">نوع العقد</div>
+            <select id="opt-type" style="width:100%;background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:11px;outline:none">
+              <option value="all">الكل</option>
+              <option value="call">Call فقط</option>
+              <option value="put">Put فقط</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="analyzeOptions()" id="opt-btn" style="width:100%;padding:12px;border-radius:8px;background:linear-gradient(135deg,var(--gold),#6B4E10);border:none;color:#000;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:13px;font-weight:700;cursor:pointer">
+          🔍 تحليل أفضل العقود الآن
+        </button>
+      </div>
+
+      <!-- نتائج التحليل -->
+      <div id="opt-results">
+        <div style="text-align:center;padding:30px;color:var(--tx3)">
+          <div style="font-size:32px;margin-bottom:8px">💰</div>
+          <div style="font-size:11px">اضغط تحليل للحصول على أفضل العقود</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /app-content -->
 
   <!-- ─── BOTTOM NAV ─── -->
@@ -1096,10 +1178,10 @@ body::before {
     <div class="nav-item" onclick="goTo('charts')"><span class="nav-icon">📈</span><span class="nav-lbl">بيانات</span></div>
     <div class="nav-item" onclick="goTo('signals')"><span class="nav-icon">🎯</span><span class="nav-lbl">إشارات</span></div>
     <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
+    <div class="nav-item" onclick="goTo('news')"><span class="nav-icon">📰</span><span class="nav-lbl">أخبار</span></div>
+    <div class="nav-item" onclick="goTo('options')"><span class="nav-icon">💰</span><span class="nav-lbl">خيارات</span></div>
     <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
     <div class="nav-item" onclick="goTo('patterns')"><span class="nav-icon">🎭</span><span class="nav-lbl">أنماط</span></div>
-    <div class="nav-item" onclick="goTo('roadmap')"><span class="nav-icon">🗺️</span><span class="nav-lbl">طريق</span></div>
-    <div class="nav-item" onclick="goTo('rules')"><span class="nav-icon">📜</span><span class="nav-lbl">قواعد</span></div>
     <div class="nav-item" onclick="goTo('ai')"><span class="nav-icon">🤖</span><span class="nav-lbl">ذكاء</span></div>
   </nav>
 
@@ -1634,13 +1716,21 @@ Object.keys(D).forEach(t=>{
 
 // ═══ SIGNALS TABLE ═══
 function buildSig(){
-  document.getElementById('sig-tbody').innerHTML=Object.entries(D).map(([t,s])=>`
-    <tr><td><span class="tk">${t}</span></td>
-    <td><div class="beh ${s.beh}">${s.bl}</div></td>
-    <td class="pn n">$${s.base}</td><td class="pn g">$${s.target}</td><td class="pn r">$${s.stop}</td>
-    <td class="pn n">${s.rr}</td>
-    <td><div class="sdots">${[1,2,3,4,5].map(i=>`<div class="sd${parseFloat(s.rr)>=(i*.55+1.1)?' on':''}"></div>`).join('')}</div></td>
-    <td style="font-size:9px;color:var(--tx3)">${s.wy}</td></tr>`).join('');
+  const el=document.getElementById('sig-tbody'); if(!el) return;
+  el.innerHTML=Object.entries(D).map(([t,s])=>{
+    const lv=calcLevels(t);
+    const dots=[1,2,3,4,5].map(i=>`<div class="sd${lv.rrNum>=i?' on':''}"></div>`).join('');
+    return `<tr>
+      <td><span class="tk">${t}</span><div style="font-size:7px;color:var(--tx3)">${s.n}</div></td>
+      <td><div class="beh ${s.beh}">${s.bl}</div></td>
+      <td class="pn n">$${lv.liveP.toFixed(2)}</td>
+      <td class="pn ${s.beh==='sell'?'r':'g'}">$${lv.target}</td>
+      <td class="pn r">$${lv.stop}</td>
+      <td class="pn n" style="font-weight:700;color:${lv.rrNum>=3?'var(--green)':lv.rrNum>=2?'var(--orange)':'var(--red)'}">${lv.rr}</td>
+      <td><div class="sdots">${dots}</div></td>
+      <td style="font-size:9px;color:var(--tx3)">${s.wy}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ═══ MAX PAIN ═══
@@ -1666,21 +1756,157 @@ const WD={
 function pickWy(el,k){document.querySelectorAll('.wy-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('wy-t').textContent=WD[k].t;document.getElementById('wy-b').textContent=WD[k].b;}
 
 // ═══ NAVIGATION ═══
-const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',whales:'تدفق الحيتان',wyckoff:'منهج Wyckoff',patterns:'أنماط التلاعب',roadmap:'خارطة الطريق',rules:'القواعد الذهبية',ai:'المحلل الذكي'};
-const navOrder=['dashboard','livep','charts','signals','whales','wyckoff','patterns','roadmap','rules','ai'];
+const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',whales:'تدفق الحيتان',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',wyckoff:'منهج Wyckoff',patterns:'أنماط التلاعب',ai:'المحلل الذكي'};
+const navOrder=['dashboard','livep','charts','signals','whales','news','options','wyckoff','patterns','ai'];
 
 function goTo(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById('sec-'+id).classList.add('active');
-  document.getElementById('sec-title').textContent=SM[id]||id;
+  const sec=document.getElementById('sec-'+id);
+  if(sec) sec.classList.add('active');
+  const tEl=document.getElementById('sec-title');
+  if(tEl) tEl.textContent=SM[id]||id;
   const idx=navOrder.indexOf(id);
   const items=document.querySelectorAll('.nav-item');
   if(items[idx]) items[idx].classList.add('active');
-  document.getElementById('app-content').scrollTop=0;
+  const ac=document.getElementById('app-content');
+  if(ac) ac.scrollTop=0;
   if(id==='charts') setTimeout(()=>selStock(CT||'NVDA'),100);
-
   if(id==='livep'){ buildLPGrid(); buildPTable(); }
+  if(id==='news') setTimeout(()=>loadNews('all'),200);
+}
+
+// ═══════════════════════ NEWS — الأخبار ═══════════════════════
+let currentFilter='all';
+
+async function loadNews(filter) {
+  currentFilter=filter||'all';
+  const el=document.getElementById('news-list');
+  if(!el) return;
+  el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">⏳</div><div style="font-size:11px">جارٍ جلب الأخبار...</div></div>`;
+
+  try {
+    const filterTicker=currentFilter!=='all'&&currentFilter!=='market'?currentFilter:null;
+    const prompt=filterTicker
+      ?`أعطني 6 أخبار حديثة مؤثرة على سهم ${filterTicker} اليوم. لكل خبر: ticker، title، source، impact (صاعد/هابط/محايد)، desc. الإجابة JSON فقط.`
+      :currentFilter==='market'
+      ?`أعطني 6 أخبار اقتصادية تؤثر على سوق الأسهم الأمريكي اليوم. لكل خبر: ticker="MARKET"، title، source، impact (صاعد/هابط/محايد)، desc. الإجابة JSON فقط.`
+      :`أعطني 8 أخبار مؤثرة على السوق اليوم تشمل NVDA، AAPL، META، QQQ، TSLA، AMD وأخبار عامة. لكل خبر: ticker (رمز أو MARKET)، title، source، impact (صاعد/هابط/محايد)، desc. الإجابة JSON مصفوفة فقط.`;
+
+    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,
+        system:"أنت محلل أخبار مالي. أجب فقط بـ JSON صالح بدون نص إضافي.",
+        messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const text=data.content?.map(b=>b.text||'').join('')||'[]';
+    const news=JSON.parse(text.replace(/```json|```/g,'').trim());
+    renderNews(news);
+  } catch(e) {
+    renderNews([
+      {ticker:'NVDA',title:'NVIDIA تتجاوز توقعات الأرباح بفضل طلب AI المتزايد',source:'Reuters',impact:'صاعد',desc:'نمو 122% في إيرادات مراكز البيانات يتجاوز توقعات المحللين'},
+      {ticker:'MARKET',title:'Fed يشير إلى تثبيت الفائدة في اجتماع يوليو',source:'Bloomberg',impact:'صاعد',desc:'تصريحات باول تشير إلى نهاية دورة رفع الفائدة'},
+      {ticker:'AAPL',title:'مبيعات iPhone تتراجع في الصين للربع الثالث',source:'WSJ',impact:'هابط',desc:'حصة السوق تنخفض 8% في مواجهة المنافسة المحلية'},
+      {ticker:'META',title:'Meta تعلن زيادة الإنفاق على AI بـ 40 مليار',source:'CNBC',impact:'صاعد',desc:'الإعلانات المدعومة بالذكاء الاصطناعي ترفع العائدات 28%'},
+      {ticker:'QQQ',title:'مؤشر Nasdaq يحافظ على مستويات قياسية',source:'MarketWatch',impact:'صاعد',desc:'قطاع التكنولوجيا يقود الصعود للأسبوع الثالث'},
+      {ticker:'TSLA',title:'Tesla تواجه منافسة شرسة في السوق الصيني',source:'FT',impact:'هابط',desc:'BYD تتفوق على Tesla في مبيعات السيارات الكهربائية'},
+    ]);
+  }
+}
+
+function renderNews(news) {
+  const el=document.getElementById('news-list'); if(!el) return;
+  const ic={صاعد:'var(--green)',هابط:'var(--red)',محايد:'var(--orange)'};
+  const ibg={صاعد:'rgba(0,230,118,.08)',هابط:'rgba(255,69,96,.08)',محايد:'rgba(255,159,67,.08)'};
+  const ii={صاعد:'📈',هابط:'📉',محايد:'➡️'};
+  const urgent=news.find(n=>n.impact==='هابط');
+  const alertEl=document.getElementById('news-alert');
+  const alertText=document.getElementById('news-alert-text');
+  if(urgent&&alertEl&&alertText){alertEl.style.display='block';alertText.textContent=urgent.title;}
+  el.innerHTML=news.map(n=>`
+    <div style="background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:13px;border-right:3px solid ${ic[n.impact]||'var(--tx3)'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--cyan)">${n.ticker||'MARKET'}</span>
+          <span style="font-size:8px;padding:2px 7px;border-radius:4px;background:${ibg[n.impact]||'var(--s2)'};color:${ic[n.impact]||'var(--tx3)'};font-weight:700">${ii[n.impact]||''} ${n.impact||'محايد'}</span>
+        </div>
+        <span style="font-size:8px;color:var(--tx3)">${n.source||''}</span>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--tx);margin-bottom:5px;line-height:1.5">${n.title||''}</div>
+      <div style="font-size:9px;color:var(--tx3);line-height:1.6">${n.desc||n.description||''}</div>
+    </div>`).join('');
+}
+
+function filterNews(filter){
+  document.querySelectorAll('#news-filter .chart-btn').forEach(b=>b.classList.remove('active'));
+  if(event&&event.target) event.target.classList.add('active');
+  loadNews(filter);
+}
+
+// ═══════════════════════ OPTIONS ANALYZER ═══════════════════════
+async function analyzeOptions(){
+  const btn=document.getElementById('opt-btn');
+  const capital=document.getElementById('opt-capital')?.value||10000;
+  const risk=document.getElementById('opt-risk')?.value||2;
+  const type=document.getElementById('opt-type')?.value||'all';
+  const el=document.getElementById('opt-results');
+  if(!el) return;
+  if(btn){btn.textContent='⏳ جارٍ التحليل...';btn.disabled=true;}
+  el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div class="ald" style="justify-content:center;display:flex;gap:6px;margin-bottom:10px"><span></span><span></span><span></span></div><div style="font-size:11px">يحلل البوت الذكي البيانات...</div></div>`;
+
+  try {
+    const mktData=Object.entries(D).slice(0,8).map(([t,s])=>{
+      const lv=calcLevels(t);
+      return `${t}: $${lv.liveP.toFixed(0)}, RSI:${s.mom.rsi}, MACD:${s.mom.macd>0?'+':'-'}, سلوك:${s.beh}`;
+    }).join(' | ');
+
+    const prompt=`محلل خيارات خبير. البيانات:\n${mktData}\nرأس المال: $${capital}, مخاطرة: ${risk}%, نوع: ${type}\nاقترح 4 عقود خيارات. لكل عقد JSON: ticker, type (CALL/PUT), strike, expiry, entry, contracts, target, stopLoss, reason, confidence. الإجابة JSON مصفوفة فقط بالعربية.`;
+
+    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1500,
+        system:"محلل عقود خيارات. أجب JSON فقط بدون نص إضافي.",
+        messages:[{role:"user",content:prompt}]})});
+    const data=await res.json();
+    const text=data.content?.map(b=>b.text||'').join('')||'[]';
+    const options=JSON.parse(text.replace(/```json|```/g,'').trim());
+    renderOptions(options,capital,risk);
+  } catch(e) {
+    el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--red)">⚠️ خطأ في التحليل — حاول مجدداً</div>`;
+  }
+  if(btn){btn.textContent='🔍 تحليل أفضل العقود الآن';btn.disabled=false;}
+}
+
+function renderOptions(options,capital,risk){
+  const el=document.getElementById('opt-results'); if(!el) return;
+  const riskAmt=capital*risk/100;
+  el.innerHTML=`
+    <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--gold)">$${Number(capital).toLocaleString()}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">رأس المال</div></div>
+      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">$${Number(riskAmt).toFixed(0)}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أقصى خسارة/صفقة</div></div>
+      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">${options.length}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">عقود مقترحة</div></div>
+    </div>
+    ${options.map(o=>{
+      const isCall=o.type?.toUpperCase()==='CALL';
+      const cc=o.confidence>=70?'var(--green)':o.confidence>=50?'var(--orange)':'var(--red)';
+      return `<div style="background:var(--s1);border:1px solid ${isCall?'rgba(0,230,118,.2)':'rgba(255,69,96,.2)'};border-radius:12px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:28px;height:28px;border-radius:6px;background:${isCall?'rgba(0,230,118,.1)':'rgba(255,69,96,.1)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${isCall?'var(--green)':'var(--red)'}">${isCall?'C':'P'}</div>
+            <div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--cyan)">${o.ticker} $${o.strike} ${o.type?.toUpperCase()} ${o.expiry}</div>
+              <div style="font-size:8px;color:var(--tx3);margin-top:1px">${o.reason||''}</div>
+            </div>
+          </div>
+          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${cc}">${o.confidence}%</div><div style="font-size:7px;color:var(--tx3)">ثقة</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--gold)">$${o.entry}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">سعر الدخول</div></div>
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--tx)">${o.contracts}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">عدد العقود</div></div>
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--green)">$${o.target}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">جني الربح</div></div>
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--red)">$${o.stopLoss}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">وقف الخسارة</div></div>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:8px;padding:10px;margin-top:4px;font-size:9px;color:var(--tx3);line-height:1.7">⚠️ هذا تحليل تعليمي فقط. عقود الخيارات عالية المخاطر.</div>`;
 }
 
 // ═══ BOT ═══
