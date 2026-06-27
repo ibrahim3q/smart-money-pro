@@ -5,111 +5,123 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const { type, tickers, ticker } = req.query;
+  const { type, tickers, ticker, range } = req.query;
 
   try {
-    // ── ١. أسعار لحظية Snapshot ──────────────────────────────
+
+    // ── ١. أسعار لحظية Snapshot (default) ──────────────────
     if (!type || type === 'snapshot') {
-      const url = `${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers}&apiKey=${API_KEY}`;
-      const r   = await fetch(url);
-      const d   = await r.json();
-      if (d.tickers?.length) return res.json({ type:'snapshot', tickers: d.tickers });
+      const url  = `${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers}&apiKey=${API_KEY}`;
+      const r    = await fetch(url);
+      const data = await r.json();
+
+      if (data.tickers?.length) {
+        return res.status(200).json({ type:'snapshot', tickers: data.tickers });
+      }
 
       // Fallback: إغلاق أمس
       const yesterday  = prevTradingDay();
       const tickerList = (tickers||'').split(',').map(t=>t.trim()).filter(Boolean);
       const prices     = [];
+
       for (const t of tickerList) {
         try {
           await sleep(120);
-          const rr = await fetch(`${BASE}/v1/open-close/${t}/${yesterday}?adjusted=true&apiKey=${API_KEY}`);
-          const dd = await rr.json();
-          if (dd.close) prices.push({ ticker:t, close:dd.close, open:dd.open, high:dd.high, low:dd.low, volume:dd.volume, date:dd.from });
+          const rr  = await fetch(`${BASE}/v1/open-close/${t}/${yesterday}?adjusted=true&apiKey=${API_KEY}`);
+          const dd  = await rr.json();
+          if (dd.close) prices.push({
+            ticker:t, close:dd.close, open:dd.open,
+            high:dd.high, low:dd.low, volume:dd.volume, date:dd.from
+          });
         } catch(e) {}
       }
-      return res.json({ type:'prevclose', prices, date:yesterday });
+      return res.status(200).json({ type:'prevclose', prices, date:yesterday });
     }
 
     // ── ٢. بيانات تاريخية للرسم البياني ─────────────────────
     if (type === 'history') {
-      const t    = ticker || 'NVDA';
-      const range= req.query.range || '1W';
-      const { multiplier, timespan, from } = rangeConfig(range);
-      const url  = `${BASE}/v2/aggs/ticker/${t}/range/${multiplier}/${timespan}/${from}/${today()}?adjusted=true&sort=asc&limit=500&apiKey=${API_KEY}`;
+      const t   = (ticker||'NVDA').toUpperCase();
+      const rng = range || '1W';
+      const { multiplier, timespan, from } = rangeConfig(rng);
+      const to  = todayStr();
+
+      const url  = `${BASE}/v2/aggs/ticker/${t}/range/${multiplier}/${timespan}/${from}/${to}?adjusted=true&sort=asc&limit=500&apiKey=${API_KEY}`;
       const r    = await fetch(url);
-      const d    = await r.json();
-      return res.json({ type:'history', ticker:t, range, results: d.results || [] });
+      const data = await r.json();
+
+      if (data.results?.length > 0) {
+        return res.status(200).json({
+          type:'history', ticker:t, range:rng,
+          results: data.results.map(b=>({ t:b.t, o:b.o, h:b.h, l:b.l, c:b.c, v:b.v }))
+        });
+      }
+      return res.status(200).json({ type:'history', ticker:t, range:rng, results:[] });
     }
 
-    // ── ٣. مؤشرات تقنية (RSI, MACD, EMA) ────────────────────
+    // ── ٣. مؤشرات تقنية ──────────────────────────────────────
     if (type === 'indicators') {
-      const t = ticker || 'NVDA';
+      const t = (ticker||'NVDA').toUpperCase();
       const [rsiR, macdR, emaR, smaR] = await Promise.allSettled([
         fetch(`${BASE}/v1/indicators/rsi/${t}?timespan=day&adjusted=true&window=14&series_type=close&limit=1&apiKey=${API_KEY}`).then(r=>r.json()),
         fetch(`${BASE}/v1/indicators/macd/${t}?timespan=day&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&limit=1&apiKey=${API_KEY}`).then(r=>r.json()),
         fetch(`${BASE}/v1/indicators/ema/${t}?timespan=day&adjusted=true&window=20&series_type=close&limit=2&apiKey=${API_KEY}`).then(r=>r.json()),
-        fetch(`${BASE}/v1/indicators/sma/${t}?timespan=day&adjusted=true&window=50&series_type=close&limit=2&apiKey=${API_KEY}`).then(r=>r.json()),
+        fetch(`${BASE}/v1/indicators/sma/${t}?timespan=day&adjusted=true&window=50&series_type=close&limit=1&apiKey=${API_KEY}`).then(r=>r.json()),
       ]);
-
-      const rsi  = rsiR.status==='fulfilled'  ? rsiR.value?.results?.values?.[0]?.value  : null;
-      const macd = macdR.status==='fulfilled' ? macdR.value?.results?.values?.[0]        : null;
-      const ema20= emaR.status==='fulfilled'  ? emaR.value?.results?.values?.[0]?.value  : null;
-      const ema20prev= emaR.status==='fulfilled'?emaR.value?.results?.values?.[1]?.value : null;
-      const sma50= smaR.status==='fulfilled'  ? smaR.value?.results?.values?.[0]?.value  : null;
-
-      return res.json({ type:'indicators', ticker:t, rsi, macd, ema20, ema20prev, sma50 });
+      return res.status(200).json({
+        type:'indicators', ticker:t,
+        rsi:   rsiR.status==='fulfilled'  ? rsiR.value?.results?.values?.[0]?.value  : null,
+        macd:  macdR.status==='fulfilled' ? macdR.value?.results?.values?.[0]        : null,
+        ema20: emaR.status==='fulfilled'  ? emaR.value?.results?.values?.[0]?.value  : null,
+        sma50: smaR.status==='fulfilled'  ? smaR.value?.results?.values?.[0]?.value  : null,
+      });
     }
 
-    // ── ٤. Fear & Greed + VIX ────────────────────
+    // ── ٤. بيانات السوق (VIX + Fear&Greed) ──────────────────
     if (type === 'market') {
-      // VIX من Polygon عبر VIXY ETF
-      let vix = null;
+      let vix = null, fearGreed = null;
+
+      // VIX
       try {
-        const vixRes  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY,UVXY&apiKey=${API_KEY}`);
-        const vixData = await vixRes.json();
-        vix = vixData?.tickers?.[0]?.day?.c || null;
+        const vr   = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY&apiKey=${API_KEY}`);
+        const vd   = await vr.json();
+        vix = vd?.tickers?.[0]?.day?.c || null;
       } catch(e) {}
 
       // Fear & Greed من CNN
-      let fearGreed = null;
       try {
-        const fgRes  = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+        const fgR = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+          headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}
         });
-        if(fgRes.ok) {
-          const fgData = await fgRes.json();
-          fearGreed = fgData?.fear_and_greed?.score
-            || fgData?.score
-            || fgData?.data?.[fgData.data.length-1]?.y
-            || null;
+        if(fgR.ok) {
+          const fgD = await fgR.json();
+          fearGreed = fgD?.fear_and_greed?.score || fgD?.score || null;
         }
       } catch(e) {}
 
-      // Fallback: احسب Fear&Greed تقريبياً من SPY performance
+      // Fallback: احسب من SPY
       if(!fearGreed) {
         try {
-          const spyRes  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=SPY&apiKey=${API_KEY}`);
-          const spyData = await spyRes.json();
-          const spyChg  = spyData?.tickers?.[0]?.todaysChangePerc || 0;
-          // تقدير تقريبي: +2% ≈ جشع 70، -2% ≈ خوف 30
-          fearGreed = Math.min(95, Math.max(5, 50 + spyChg * 10));
+          const sr  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=SPY&apiKey=${API_KEY}`);
+          const sd  = await sr.json();
+          const chg = sd?.tickers?.[0]?.todaysChangePerc || 0;
+          fearGreed = Math.min(95, Math.max(5, 50 + chg*10));
         } catch(e) {}
       }
 
       return res.status(200).json({ type:'market', vix, fearGreed });
     }
 
-    res.status(400).json({ error: 'unknown type' });
+    res.status(400).json({ error:'unknown type' });
 
   } catch(err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Helpers ──
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
-function today() {
+function todayStr() {
   return new Date().toISOString().slice(0,10);
 }
 
@@ -121,14 +133,14 @@ function prevTradingDay() {
 }
 
 function rangeConfig(range) {
-  const ny = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const ny  = new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
   const fmt = d => d.toISOString().slice(0,10);
   const sub = (d,n) => { const r=new Date(d); r.setDate(r.getDate()-n); return r; };
   switch(range) {
-    case '1D': return { multiplier:5,  timespan:'minute', from: fmt(sub(ny,1))  };
-    case '1W': return { multiplier:1,  timespan:'hour',   from: fmt(sub(ny,7))  };
-    case '1M': return { multiplier:1,  timespan:'day',    from: fmt(sub(ny,30)) };
-    case '3M': return { multiplier:1,  timespan:'day',    from: fmt(sub(ny,90)) };
-    default:   return { multiplier:1,  timespan:'day',    from: fmt(sub(ny,30)) };
+    case '1D': return { multiplier:5,  timespan:'minute', from:fmt(sub(ny,1))  };
+    case '1W': return { multiplier:1,  timespan:'hour',   from:fmt(sub(ny,7))  };
+    case '1M': return { multiplier:1,  timespan:'day',    from:fmt(sub(ny,31)) };
+    case '3M': return { multiplier:1,  timespan:'day',    from:fmt(sub(ny,92)) };
+    default:   return { multiplier:1,  timespan:'day',    from:fmt(sub(ny,31)) };
   }
 }
