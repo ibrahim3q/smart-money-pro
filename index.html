@@ -864,7 +864,7 @@ body::before {
       <!-- TRADINGVIEW CHART -->
       <div class="chart-wrap mb10">
         <div class="chart-header">
-          <div class="chart-title" id="ch-title">NVDA — بيانات حقيقية من TradingView</div>
+          <div class="chart-title" id="ch-title">NVDA — السعر + التوقع</div>
           <div class="chart-btns">
             <button class="chart-btn active" onclick="setTV('1W','1W')">1W</button>
             <button class="chart-btn" onclick="setTV('1D','1M')">1M</button>
@@ -872,17 +872,16 @@ body::before {
             <button class="chart-btn" onclick="setTV('1','1D')">يوم</button>
           </div>
         </div>
-        <!-- TradingView Widget -->
-        <div id="tv-container" style="height:380px;background:var(--s2)">
-          <div class="tradingview-widget-container" style="height:100%;width:100%">
-            <div id="tv-widget" style="height:100%;width:100%"></div>
-          </div>
+        <!-- Chart.js Canvas -->
+        <div style="padding:12px;background:var(--s2)">
+          <canvas id="MC" height="300"></canvas>
         </div>
         <div style="padding:8px 14px;border-top:1px solid var(--bd);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div class="leg"><div class="leg-line" style="background:var(--green)"></div>بيانات لحظية حقيقية</div>
-          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>مستوى الهدف</div>
-          <div class="leg"><div class="leg-line" style="background:var(--red)"></div>وقف الخسارة</div>
-          <span style="font-size:8px;color:var(--tx3);margin-right:auto">مدعوم من TradingView</span>
+          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>السعر الفعلي</div>
+          <div class="leg"><div class="leg-line" style="background:var(--cyan)"></div>التوقع</div>
+          <div class="leg"><div class="leg-line" style="background:var(--green)"></div>الهدف</div>
+          <div class="leg"><div class="leg-line" style="background:var(--red)"></div>الوقف</div>
+          <div class="leg"><div class="leg-line" style="background:rgba(0,230,118,.3);width:14px;height:8px;border-radius:2px"></div>منطقة الدخول</div>
         </div>
       </div>
 
@@ -1458,7 +1457,6 @@ let tvWidget = null;
 let CT = 'NVDA';
 let tvInterval = '1D';
 
-// خريطة رموز TradingView
 const TV_MAP = {
   NVDA:'NASDAQ:NVDA', QQQ:'NASDAQ:QQQ', AMD:'NASDAQ:AMD',
   AAPL:'NASDAQ:AAPL', COIN:'NASDAQ:COIN', TSLA:'NASDAQ:TSLA',
@@ -1548,7 +1546,7 @@ function selStock(t) {
   cel.textContent = (pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';
   cel.className   = 'pr-chg '+(pct>=0?'up':'dn');
 
-  document.getElementById('ch-title').textContent  = `${t} — بيانات حقيقية من TradingView`;
+  document.getElementById('ch-title').textContent  = `${t} — السعر + التوقع`;
   document.getElementById('pr-meta').textContent   = `هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
   const pb = document.getElementById('pr-beh');
   pb.textContent = s.bl; pb.className = 'beh '+s.beh;
