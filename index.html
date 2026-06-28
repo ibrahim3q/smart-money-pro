@@ -1968,27 +1968,35 @@ async function analyzeOptions(){
     const typeText=type==='call'?'Call فقط':type==='put'?'Put فقط':'Call و Put';
     const riskAmt=(capital*risk/100).toFixed(0);
 
-    const prompt=`أنت محلل عقود خيارات محترف. بناءً على بيانات السوق الحالية:
+    const prompt=`أنت متداول خيارات محترف بخبرة 15 سنة تعمل كـ prop trader. مهمتك تقديم توصيات حقيقية قابلة للتنفيذ الفوري.
 
+بيانات السوق الحالية:
 ${mktData}
 
-رأس المال: $${capital}
-المخاطرة المسموح بها: ${risk}% = $${riskAmt} لكل صفقة
+رأس المال المتاح: $${capital}
+الحد الأقصى للخسارة لكل صفقة: $${riskAmt} (${risk}%)
 نوع العقود: ${typeText}
-VIX: 18.4 (منخفض — مناسب للشراء)
-Fear & Greed: 62 (جشع — حذر من التصحيح)
+VIX: 18.4 | Fear & Greed: 62 (جشع — انتبه للتصحيحات)
+السوق: ما بعد الإغلاق — الجلسة القادمة غداً
 
-اقترح أفضل 4 عقود خيارات للشراء الآن. لكل عقد أعطني:
+قواعد الاختيار:
+1. اختر Strike قريب من السعر الحالي (ATM أو قريب منه) لأفضل نسبة Delta
+2. المدة الزمنية: 2-4 أسابيع كحد أدنى لتجنب Theta Decay
+3. احسب عدد العقود بدقة: (رأس المال × نسبة المخاطرة) ÷ (سعر العقد × 100)
+4. الهدف: 80-120% ربح من سعر الدخول
+5. وقف الخسارة: 40-50% من سعر الدخول
+
+قدم 4 توصيات محددة وقابلة للتنفيذ. لكل توصية:
 - ticker: رمز السهم
 - type: CALL أو PUT
-- strike: سعر التنفيذ المقترح (رقم)
+- strike: سعر التنفيذ (رقم دقيق)
 - expiry: تاريخ الانتهاء مثل "Jul 18 2025"
-- entry: سعر الدخول للعقد (رقم)
-- contracts: عدد العقود المناسب لرأس المال
-- target: هدف جني الربح (رقم)
-- stopLoss: وقف الخسارة (رقم)
-- reason: سبب الاختيار بالعربية
-- confidence: نسبة الثقة من 0 إلى 100
+- entry: سعر الدخول المتوقع للعقد (رقم)
+- contracts: عدد العقود المحسوب بدقة
+- target: سعر الهدف للعقد (رقم)
+- stopLoss: وقف الخسارة للعقد (رقم)
+- reason: السبب التقني المحدد (مستوى الدعم/المقاومة، الإشارة التقنية)
+- confidence: نسبة الثقة بناءً على قوة الإشارات
 
 أجب بـ JSON مصفوفة فقط بدون أي نص إضافي.`;
 
@@ -2046,26 +2054,50 @@ function renderOptions(options,capital,risk){
     ${options.map(o=>{
       const isCall=o.type?.toUpperCase()==='CALL';
       const cc=o.confidence>=70?'var(--green)':o.confidence>=50?'var(--orange)':'var(--red)';
-      return `<div style="background:var(--s1);border:1px solid ${isCall?'rgba(0,230,118,.2)':'rgba(255,69,96,.2)'};border-radius:12px;padding:14px;margin-bottom:10px">
+      const totalCost=(o.entry*o.contracts*100).toFixed(0);
+      const totalTarget=(o.target*o.contracts*100).toFixed(0);
+      const totalStop=(o.stopLoss*o.contracts*100).toFixed(0);
+      const profitPct=(((o.target-o.entry)/o.entry)*100).toFixed(0);
+      const lossPct=(((o.entry-o.stopLoss)/o.entry)*100).toFixed(0);
+      return `<div style="background:var(--s1);border:1px solid ${isCall?'rgba(0,230,118,.25)':'rgba(255,69,96,.25)'};border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:28px;height:28px;border-radius:6px;background:${isCall?'rgba(0,230,118,.1)':'rgba(255,69,96,.1)'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${isCall?'var(--green)':'var(--red)'}">${isCall?'C':'P'}</div>
+            <div style="width:30px;height:30px;border-radius:7px;background:${isCall?'rgba(0,230,118,.15)':'rgba(255,69,96,.15)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${isCall?'var(--green)':'var(--red)'}">${isCall?'C':'P'}</div>
             <div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--cyan)">${o.ticker} $${o.strike} ${o.type?.toUpperCase()} ${o.expiry}</div>
-              <div style="font-size:8px;color:var(--tx3);margin-top:1px">${o.reason||''}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--cyan)">${o.ticker} $${o.strike} ${o.type?.toUpperCase()} ${o.expiry}</div>
+              <div style="font-size:8px;color:var(--tx3);margin-top:2px">📍 ${o.reason||''}</div>
             </div>
           </div>
-          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${cc}">${o.confidence}%</div><div style="font-size:7px;color:var(--tx3)">ثقة</div></div>
+          <div style="text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${cc}">${o.confidence}%</div>
+            <div style="font-size:7px;color:var(--tx3)">ثقة</div>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--gold)">$${o.entry}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">سعر الدخول</div></div>
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--tx)">${o.contracts}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">عدد العقود</div></div>
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--green)">$${o.target}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">جني الربح</div></div>
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--red)">$${o.stopLoss}</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">وقف الخسارة</div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold)">$${o.entry}</div>
+            <div style="font-size:7px;color:var(--tx3);margin-top:2px">سعر الدخول</div>
+          </div>
+          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--tx)">${o.contracts}</div>
+            <div style="font-size:7px;color:var(--tx3);margin-top:2px">عقود</div>
+          </div>
+          <div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);border-radius:7px;padding:8px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--green)">$${o.target}</div>
+            <div style="font-size:7px;color:var(--green);margin-top:2px">+${profitPct}% هدف</div>
+          </div>
+          <div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:7px;padding:8px;text-align:center">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--red)">$${o.stopLoss}</div>
+            <div style="font-size:7px;color:var(--red);margin-top:2px">-${lossPct}% وقف</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px">
+          <span style="font-size:9px;color:var(--tx3)">💵 التكلفة الإجمالية: <span style="color:var(--tx);font-weight:700">$${totalCost}</span></span>
+          <span style="font-size:9px;color:var(--tx3)">🎯 الهدف: <span style="color:var(--green);font-weight:700">$${totalTarget}</span></span>
+          <span style="font-size:9px;color:var(--tx3)">🛑 الخسارة: <span style="color:var(--red);font-weight:700">$${totalStop}</span></span>
         </div>
       </div>`;
     }).join('')}
-    <div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:8px;padding:10px;margin-top:4px;font-size:9px;color:var(--tx3);line-height:1.7">⚠️ هذا تحليل تعليمي فقط. عقود الخيارات عالية المخاطر.</div>`;
 }
 
 // ═══ BOT ═══
