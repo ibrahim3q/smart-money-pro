@@ -2045,59 +2045,58 @@ VIX: 18.4 | Fear & Greed: 62 (جشع — انتبه للتصحيحات)
 function renderOptions(options,capital,risk){
   const el=document.getElementById('opt-results'); if(!el) return;
   const riskAmt=capital*risk/100;
-  el.innerHTML=`
-    <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--gold)">$${Number(capital).toLocaleString()}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">رأس المال</div></div>
-      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">$${Number(riskAmt).toFixed(0)}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أقصى خسارة/صفقة</div></div>
-      <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--green)">${options.length}</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">عقود مقترحة</div></div>
-    </div>
-    ${options.map(o=>{
-      const isCall=o.type?.toUpperCase()==='CALL';
-      const cc=o.confidence>=70?'var(--green)':o.confidence>=50?'var(--orange)':'var(--red)';
-      const totalCost=(o.entry*o.contracts*100).toFixed(0);
-      const totalTarget=(o.target*o.contracts*100).toFixed(0);
-      const totalStop=(o.stopLoss*o.contracts*100).toFixed(0);
-      const profitPct=(((o.target-o.entry)/o.entry)*100).toFixed(0);
-      const lossPct=(((o.entry-o.stopLoss)/o.entry)*100).toFixed(0);
-      return `<div style="background:var(--s1);border:1px solid ${isCall?'rgba(0,230,118,.25)':'rgba(255,69,96,.25)'};border-radius:12px;padding:14px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="width:30px;height:30px;border-radius:7px;background:${isCall?'rgba(0,230,118,.15)':'rgba(255,69,96,.15)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${isCall?'var(--green)':'var(--red)'}">${isCall?'C':'P'}</div>
-            <div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--cyan)">${o.ticker} $${o.strike} ${o.type?.toUpperCase()} ${o.expiry}</div>
-              <div style="font-size:8px;color:var(--tx3);margin-top:2px">📍 ${o.reason||''}</div>
-            </div>
-          </div>
-          <div style="text-align:center">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${cc}">${o.confidence}%</div>
-            <div style="font-size:7px;color:var(--tx3)">ثقة</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold)">$${o.entry}</div>
-            <div style="font-size:7px;color:var(--tx3);margin-top:2px">سعر الدخول</div>
-          </div>
-          <div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--tx)">${o.contracts}</div>
-            <div style="font-size:7px;color:var(--tx3);margin-top:2px">عقود</div>
-          </div>
-          <div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);border-radius:7px;padding:8px;text-align:center">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--green)">$${o.target}</div>
-            <div style="font-size:7px;color:var(--green);margin-top:2px">+${profitPct}% هدف</div>
-          </div>
-          <div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:7px;padding:8px;text-align:center">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--red)">$${o.stopLoss}</div>
-            <div style="font-size:7px;color:var(--red);margin-top:2px">-${lossPct}% وقف</div>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px">
-          <span style="font-size:9px;color:var(--tx3)">💵 التكلفة الإجمالية: <span style="color:var(--tx);font-weight:700">$${totalCost}</span></span>
-          <span style="font-size:9px;color:var(--tx3)">🎯 الهدف: <span style="color:var(--green);font-weight:700">$${totalTarget}</span></span>
-          <span style="font-size:9px;color:var(--tx3)">🛑 الخسارة: <span style="color:var(--red);font-weight:700">$${totalStop}</span></span>
-        </div>
-      </div>`;
-    }).join('')}
+
+  // بطاقة الملخص
+  let html = '<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+  html += '<div style="text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;font-weight:700;color:var(--gold)">$'+Number(capital).toLocaleString()+'</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">رأس المال</div></div>';
+  html += '<div style="text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;font-weight:700;color:var(--red)">$'+Number(riskAmt).toFixed(0)+'</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أقصى خسارة/صفقة</div></div>';
+  html += '<div style="text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;font-weight:700;color:var(--green)">'+options.length+'</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">عقود مقترحة</div></div>';
+  html += '</div>';
+
+  // بطاقة كل عقد
+  options.forEach(function(o) {
+    const isCall = (o.type||'').toUpperCase() === 'CALL';
+    const bc = isCall ? 'rgba(0,230,118,.25)' : 'rgba(255,69,96,.25)';
+    const bg = isCall ? 'rgba(0,230,118,.15)' : 'rgba(255,69,96,.15)';
+    const fc = isCall ? 'var(--green)' : 'var(--red)';
+    const cc = o.confidence>=70 ? 'var(--green)' : o.confidence>=50 ? 'var(--orange)' : 'var(--red)';
+    const lbl = isCall ? 'C' : 'P';
+    const totalCost   = (o.entry * o.contracts * 100).toFixed(0);
+    const totalTarget = (o.target * o.contracts * 100).toFixed(0);
+    const totalStop   = (o.stopLoss * o.contracts * 100).toFixed(0);
+    const profitPct   = (((o.target - o.entry) / o.entry) * 100).toFixed(0);
+    const lossPct     = (((o.entry - o.stopLoss) / o.entry) * 100).toFixed(0);
+
+    html += '<div style="background:var(--s1);border:1px solid '+bc+';border-radius:12px;padding:14px;margin-bottom:10px">';
+
+    // Header
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    html += '<div style="width:30px;height:30px;border-radius:7px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:'+fc+'">'+lbl+'</div>';
+    html += '<div><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--cyan)">'+o.ticker+' $'+o.strike+' '+(o.type||'').toUpperCase()+' '+o.expiry+'</div>';
+    html += '<div style="font-size:8px;color:var(--tx3);margin-top:2px">📍 '+(o.reason||'')+'</div></div></div>';
+    html += '<div style="text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:14px;font-weight:700;color:'+cc+'">'+o.confidence+'%</div><div style="font-size:7px;color:var(--tx3)">ثقة</div></div>';
+    html += '</div>';
+
+    // أرقام العقد
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">';
+    html += '<div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--gold)">$'+o.entry+'</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">سعر الدخول</div></div>';
+    html += '<div style="background:var(--s2);border-radius:7px;padding:8px;text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--tx)">'+o.contracts+'</div><div style="font-size:7px;color:var(--tx3);margin-top:2px">عقود</div></div>';
+    html += '<div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);border-radius:7px;padding:8px;text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--green)">$'+o.target+'</div><div style="font-size:7px;color:var(--green);margin-top:2px">+'+profitPct+'% هدف</div></div>';
+    html += '<div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:7px;padding:8px;text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--red)">$'+o.stopLoss+'</div><div style="font-size:7px;color:var(--red);margin-top:2px">-'+lossPct+'% وقف</div></div>';
+    html += '</div>';
+
+    // إجماليات
+    html += '<div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px">';
+    html += '<span style="font-size:9px;color:var(--tx3)">💵 التكلفة: <span style="color:var(--tx);font-weight:700">$'+totalCost+'</span></span>';
+    html += '<span style="font-size:9px;color:var(--tx3)">🎯 الهدف: <span style="color:var(--green);font-weight:700">$'+totalTarget+'</span></span>';
+    html += '<span style="font-size:9px;color:var(--tx3)">🛑 الخسارة: <span style="color:var(--red);font-weight:700">$'+totalStop+'</span></span>';
+    html += '</div>';
+
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
 }
 
 // ═══ BOT ═══
