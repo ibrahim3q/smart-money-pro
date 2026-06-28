@@ -740,7 +740,7 @@ body::before {
       <div class="g4 mb14">
         <div class="stat-card"><div class="stat-icon si-g">🐋</div><div><div class="stat-val">$2.8B</div><div class="stat-lbl">تدفق مؤسسي</div><div class="stat-ch up">▲ صافي شراء</div></div></div>
         <div class="stat-card"><div class="stat-icon si-c">📊</div><div><div class="stat-val">0.73</div><div class="stat-lbl">Put/Call</div><div class="stat-ch wa">⚠️ جشع</div></div></div>
-        <div class="stat-card"><div class="stat-icon si-gr">🎯</div><div><div class="stat-val">15</div><div class="stat-lbl">أسهم مراقبة</div><div class="stat-ch up">▲ 5 إشارات</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-gr">🎯</div><div><div class="stat-val">18</div><div class="stat-lbl">أسهم مراقبة</div><div class="stat-ch up">▲ 8 إشارات</div></div></div>
         <div class="stat-card"><div class="stat-icon si-r">🌑</div><div><div class="stat-val">HIGH</div><div class="stat-lbl">Dark Pool</div><div class="stat-ch wa">! تراكم</div></div></div>
       </div>
 
@@ -913,7 +913,7 @@ body::before {
 
     <!-- ══════════ SIGNALS ══════════ -->
     <div class="sec" id="sec-signals">
-      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🎯 الإشارات النشطة — 15 سهم</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">🎯 الإشارات النشطة — 18 سهم</div>
       <div class="card mb14">
         <div class="card-stripe"></div>
         <div class="card-title">📋 جدول الإشارات الكامل</div>
@@ -1266,6 +1266,46 @@ const D = {
     entry:[{z:'⭐ الأمثل',p:'$522–$526',why:'دعم Markup + تدفق مؤسسي إيجابي'},{z:'🛡️ محافظ',p:'$526–$532',why:'فوق الدعم المحلي'}],
     forecast:[{l:'الأسبوع',v:'$535',c:'h'},{l:'الشهر',v:'$540',c:'m'},{l:'3 أشهر',v:'$548',c:'m'},{l:'سيناريو صعودي',v:'$558',c:'m'},{l:'سيناريو هبوطي',v:'$514',c:'m'}],
     levels:[{n:'هدف',v:'$543',c:'g'},{n:'مقاومة',v:'$535',c:'n'},{n:'دعم',v:'$524',c:'n'},{n:'وقف',v:'$520',c:'r'}]},
+  AMZN:{n:'Amazon',base:228.50,chg:1.4,beh:'buy',bl:'🟢 تراكم مؤسسي',rr:'2.8:1',wy:'Markup',pool:'69%',vol:'6.8x',target:252,stop:218,h:'3 أسابيع',
+    mom:{rsi:57.2,macd:2.44,sto:64.8,adx:30.1,bb:'وسط-أعلى',ema:'صاعد',score:72},
+    entry:[{z:'⭐ الأمثل',p:'$219–$224',why:'دعم EMA20 + Vanguard تتراكم'},{z:'🛡️ محافظ',p:'$224–$229',why:'فوق الدعم بهامش أمان'}],
+    forecast:[{l:'الأسبوع',v:'$234',c:'h'},{l:'الشهر',v:'$242',c:'h'},{l:'3 أشهر',v:'$255',c:'m'},{l:'سيناريو صعودي',v:'$268',c:'m'},{l:'سيناريو هبوطي',v:'$212',c:'m'}],
+    levels:[{n:'هدف ١',v:'$242',c:'g'},{n:'هدف ٢',v:'$252',c:'g'},{n:'دعم',v:'$222',c:'n'},{n:'وقف',v:'$218',c:'r'}]},
+  SMCI:{n:'Super Micro',base:31.50,chg:2.8,beh:'buy',bl:'🟢 نشاط AI مرتفع',rr:'2.9:1',wy:'Markup',pool:'70%',vol:'10.2x',target:38,stop:29,h:'2 أسابيع',
+    mom:{rsi:62.4,macd:2.22,sto:70.6,adx:34.8,bb:'أعلى',ema:'صاعد',score:76},
+    entry:[{z:'⭐ الأمثل',p:'$29–$31',why:'دعم قوي + حجم AI غير طبيعي'},{z:'🛡️ محافظ',p:'$31–$33',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$33',c:'h'},{l:'الشهر',v:'$36',c:'h'},{l:'3 أشهر',v:'$42',c:'m'},{l:'سيناريو صعودي',v:'$48',c:'m'},{l:'سيناريو هبوطي',v:'$27',c:'m'}],
+    levels:[{n:'هدف ١',v:'$35',c:'g'},{n:'هدف ٢',v:'$38',c:'g'},{n:'دعم',v:'$30',c:'n'},{n:'وقف',v:'$29',c:'r'}]},
+  PLTR:{n:'Palantir',base:110.40,chg:2.2,beh:'buy',bl:'🟢 تدفق مؤسسي',rr:'2.5:1',wy:'Markup',pool:'67%',vol:'8.4x',target:126,stop:102,h:'3 أسابيع',
+    mom:{rsi:61.4,macd:3.88,sto:68.2,adx:34.4,bb:'أعلى-وسط',ema:'صاعد',score:74},
+    entry:[{z:'⭐ الأمثل',p:'$102–$106',why:'دعم + Cathie Wood تشتري'},{z:'🛡️ محافظ',p:'$106–$111',why:'فوق مستوى الدعم'}],
+    forecast:[{l:'الأسبوع',v:'$115',c:'h'},{l:'الشهر',v:'$120',c:'h'},{l:'3 أشهر',v:'$128',c:'m'},{l:'سيناريو صعودي',v:'$140',c:'m'},{l:'سيناريو هبوطي',v:'$98',c:'m'}],
+    levels:[{n:'هدف ١',v:'$118',c:'g'},{n:'هدف ٢',v:'$126',c:'g'},{n:'دعم',v:'$105',c:'n'},{n:'وقف',v:'$102',c:'r'}]},
+  MSTR:{n:'MicroStrategy',base:84.50,chg:3.2,beh:'buy',bl:'🟢 مرتبط BTC',rr:'2.3:1',wy:'Markup',pool:'62%',vol:'9.6x',target:98,stop:78,h:'4 أسابيع',
+    mom:{rsi:60.8,macd:4.44,sto:66.8,adx:30.2,bb:'أعلى',ema:'صاعد',score:72},
+    entry:[{z:'⭐ الأمثل',p:'$78–$81',why:'ارتداد مع BTC + تراكم مؤسسي'},{z:'🛡️ محافظ',p:'$81–$85',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$88',c:'h'},{l:'الشهر',v:'$93',c:'m'},{l:'3 أشهر',v:'$98',c:'m'},{l:'سيناريو صعودي',v:'$115',c:'l'},{l:'سيناريو هبوطي',v:'$72',c:'m'}],
+    levels:[{n:'هدف ١',v:'$92',c:'g'},{n:'هدف ٢',v:'$98',c:'g'},{n:'دعم',v:'$80',c:'n'},{n:'وقف',v:'$78',c:'r'}]},
+  SQQQ:{n:'Inverse NASDAQ 3x',base:41.50,chg:-1.8,beh:'watch',bl:'👁 تحوط — حذر',rr:'2.0:1',wy:'Markdown',pool:'45%',vol:'12.4x',target:50,stop:38,h:'1 أسبوع',
+    mom:{rsi:38.4,macd:-0.44,sto:32.4,adx:28.8,bb:'أسفل',ema:'هابط',score:32},
+    entry:[{z:'⚠️ تحوط فقط',p:'$41–$43',why:'للتحوط عند خوف السوق VIX > 25'},{z:'🔴 بيع السوق',p:'عند انهيار QQQ',why:'SQQQ يصعد عكس NASDAQ'}],
+    forecast:[{l:'إذا هبط QQQ 5%',v:'$48',c:'m'},{l:'إذا هبط QQQ 10%',v:'$55',c:'m'},{l:'إذا صعد QQQ',v:'$36',c:'h'},{l:'سيناريو هبوط سوق',v:'$60',c:'l'},{l:'سيناريو صعود سوق',v:'$33',c:'m'}],
+    levels:[{n:'هدف تحوط',v:'$50',c:'g'},{n:'مقاومة',v:'$48',c:'n'},{n:'دعم',v:'$40',c:'n'},{n:'وقف',v:'$38',c:'r'}]},
+  IBIT:{n:'BlackRock Bitcoin ETF',base:33.50,chg:2.4,beh:'buy',bl:'🟢 تراكم مؤسسي ضخم',rr:'2.7:1',wy:'Markup',pool:'74%',vol:'9.8x',target:39,stop:31,h:'3 أسابيع',
+    mom:{rsi:63.2,macd:1.88,sto:70.4,adx:36.4,bb:'أعلى',ema:'صاعد',score:80},
+    entry:[{z:'⭐ الأمثل',p:'$31–$33',why:'BlackRock تتراكم + BTC صاعد'},{z:'🛡️ محافظ',p:'$33–$34',why:'فوق دعم EMA20'}],
+    forecast:[{l:'الأسبوع',v:'$35',c:'h'},{l:'الشهر',v:'$37',c:'h'},{l:'3 أشهر',v:'$42',c:'m'},{l:'سيناريو صعودي',v:'$48',c:'m'},{l:'سيناريو هبوطي',v:'$29',c:'m'}],
+    levels:[{n:'هدف ١',v:'$36',c:'g'},{n:'هدف ٢',v:'$39',c:'g'},{n:'دعم',v:'$32',c:'n'},{n:'وقف',v:'$31',c:'r'}]},
+  ARM:{n:'ARM Holdings',base:333.50,chg:2.2,beh:'buy',bl:'🟢 قطاع AI',rr:'2.4:1',wy:'Markup',pool:'63%',vol:'7.2x',target:382,stop:308,h:'4 أسابيع',
+    mom:{rsi:57.8,macd:4.44,sto:64.4,adx:29.8,bb:'وسط-أعلى',ema:'صاعد',score:68},
+    entry:[{z:'⭐ الأمثل',p:'$308–$318',why:'دعم + نمو AI chips مستمر'},{z:'🛡️ محافظ',p:'$318–$335',why:'فوق الدعم الحالي'}],
+    forecast:[{l:'الأسبوع',v:'$345',c:'h'},{l:'الشهر',v:'$362',c:'h'},{l:'3 أشهر',v:'$382',c:'m'},{l:'سيناريو صعودي',v:'$420',c:'m'},{l:'سيناريو هبوطي',v:'$295',c:'m'}],
+    levels:[{n:'هدف ١',v:'$355',c:'g'},{n:'هدف ٢',v:'$382',c:'g'},{n:'دعم',v:'$315',c:'n'},{n:'وقف',v:'$308',c:'r'}]},
+  MRVL:{n:'Marvell Tech',base:268.50,chg:1.6,beh:'buy',bl:'🟢 شرائح AI',rr:'2.2:1',wy:'Late Acc',pool:'60%',vol:'6.4x',target:308,stop:248,h:'4 أسابيع',
+    mom:{rsi:53.4,macd:3.12,sto:58.8,adx:25.6,bb:'وسط',ema:'صاعد',score:62},
+    entry:[{z:'⭐ الأمثل',p:'$248–$258',why:'دعم + طلب شرائح AI متزايد'},{z:'🛡️ محافظ',p:'$258–$270',why:'فوق الدعم بهامش'}],
+    forecast:[{l:'الأسبوع',v:'$275',c:'h'},{l:'الشهر',v:'$288',c:'m'},{l:'3 أشهر',v:'$308',c:'m'},{l:'سيناريو صعودي',v:'$335',c:'m'},{l:'سيناريو هبوطي',v:'$240',c:'m'}],
+    levels:[{n:'هدف ١',v:'$285',c:'g'},{n:'هدف ٢',v:'$308',c:'g'},{n:'دعم',v:'$255',c:'n'},{n:'وقف',v:'$248',c:'r'}]},
 };
 
 // ═══════════════════════ POLYGON.IO — أسعار حقيقية ═══════════════════════
@@ -1601,25 +1641,23 @@ function selStock(t) {
   CT = t;
   const s = D[t];
   const lp = LP[t];
+  const lv = calcLevels(t);
 
   // تحديث تبويبات الأسهم
   document.querySelectorAll('.stab').forEach(x => x.classList.toggle('active', x.dataset.t===t));
 
   // تحديث صف السعر
-  document.getElementById('pr-name').textContent  = `${t} — ${s.n}`;
   const p   = lp.p || s.base;
   const pct = lp.chgPct || 0;
-  const amt = lp.chgAmt || 0;
+  document.getElementById('pr-name').textContent  = `${t} — ${s.n}`;
   document.getElementById('pr-price').textContent = `$${p.toFixed(2)}`;
   const cel = document.getElementById('pr-chg');
-  cel.textContent = (pct>=0?'▲ +':'▼ ')+pct.toFixed(2)+'%';
+  cel.textContent = (pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';
   cel.className   = 'pr-chg '+(pct>=0?'up':'dn');
-
   document.getElementById('ch-title').textContent  = `${t} — السعر + التوقع`;
-  document.getElementById('pr-meta').textContent   = `هدف: $${s.target} | وقف: $${s.stop} | ${s.h}`;
+  document.getElementById('pr-meta').textContent   = `هدف: $${lv.target} | وقف: $${lv.stop} | R:R ${lv.rr}`;
   const pb = document.getElementById('pr-beh');
   pb.textContent = s.bl; pb.className = 'beh '+s.beh;
-
   const sess = getSess();
   const ps = document.getElementById('pr-sess');
   if(ps){ ps.className='sess-badge '+sess.cls; ps.textContent=sess.lbl; }
@@ -1630,41 +1668,51 @@ function selStock(t) {
   // بناء الرسم البياني
   buildChart(t, CR);
 
-  // توقعات الأسعار
+  // توقعات الأسعار — ديناميكية
   const bc={h:'badge-h',m:'badge-m',l:'badge-l'};
   const bv={h:'ثقة عالية',m:'متوسطة',l:'منخفضة'};
   const fcColor = s.beh==='sell'?'var(--red)':'var(--green)';
-  document.getElementById('fc-rows').innerHTML = s.forecast.map(f=>`
+  const forecasts=[
+    {l:'الأسبوع',v:`$${lv.wk1}`,c:'h'},
+    {l:'الشهر',v:`$${lv.mo1}`,c:'h'},
+    {l:'3 أشهر',v:`$${lv.mo3}`,c:'m'},
+    {l:'سيناريو صعودي',v:`$${lv.bull}`,c:'m'},
+    {l:'سيناريو هبوطي',v:`$${lv.bear}`,c:'m'},
+  ];
+  document.getElementById('fc-rows').innerHTML = forecasts.map(f=>`
     <div class="fc-row">
       <div class="fc-lbl">${f.l}</div>
       <div style="display:flex;align-items:center;gap:6px">
         <div class="fc-val" style="color:${f.l.includes('هبوط')?'var(--red)':fcColor}">${f.v}</div>
-        <div class="fc-badge ${bc[f.c]||'badge-m'}">${bv[f.c]||f.c}</div>
+        <div class="fc-badge ${bc[f.c]}">${bv[f.c]}</div>
       </div>
     </div>`).join('');
 
-  // سيناريوهات
+  // سيناريوهات — ديناميكية
   document.getElementById('scenarios').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:5px">
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--green)">🟢 صعودي (65%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${s.target}→$${Math.round(s.target*1.08)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green)">$${lv.mo1}→$${lv.bull}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--orange)">🟡 محايد (20%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${Math.round(s.base*.99)}→$${Math.round(s.base*1.03)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--orange)">$${+(p*.99).toFixed(0)}→$${+(p*1.03).toFixed(0)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:6px 9px;background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.14);border-radius:6px">
         <span style="font-size:9px;color:var(--red)">🔴 هبوطي (15%)</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${s.stop}→$${Math.round(s.stop*.95)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red)">$${lv.stop}→$${lv.bear}</span>
       </div>
     </div>`;
 
-  // مناطق الدخول
+  // مناطق الدخول — ديناميكية
   const ecc={buy:'rgba(0,230,118,.08)',sell:'rgba(255,69,96,.08)',watch:'rgba(168,85,247,.07)'};
   const ecb={buy:'rgba(0,230,118,.22)',sell:'rgba(255,69,96,.22)',watch:'rgba(168,85,247,.2)'};
   const ezc={buy:'var(--green)',sell:'var(--red)',watch:'var(--purple)'};
-  document.getElementById('entry-zones').innerHTML = s.entry.map(e=>`
+  document.getElementById('entry-zones').innerHTML = [
+    {z:'⭐ الأمثل', p:`$${lv.e1Lo}–$${lv.e1Hi}`, why:s.entry?.[0]?.why||'دعم + مؤشرات مواتية'},
+    {z:'🛡️ محافظ',  p:`$${+(p*(s.beh==='sell'?1.005:0.995)).toFixed(2)}–$${+(p*(s.beh==='sell'?1.012:1.008)).toFixed(2)}`, why:s.entry?.[1]?.why||'فوق الدعم بهامش أمان'},
+  ].map(e=>`
     <div class="entry-zone" style="background:${ecc[s.beh]};border-color:${ecb[s.beh]};margin-bottom:7px">
       <div class="ez-label" style="color:${ezc[s.beh]}">${e.z}</div>
       <div class="ez-price" style="color:${ezc[s.beh]}">${e.p}</div>
@@ -1713,6 +1761,68 @@ Object.keys(D).forEach(t=>{
   b.onclick=()=>selStock(t);
   ctabs.appendChild(b);
 });
+
+// ═══ حساب المستويات الديناميكية بالأسعار الحقيقية ═══
+function calcLevels(t) {
+  const s=D[t];
+  if(!s) return {target:0,stop:0,e1Lo:0,e1Hi:0,rr:'—',rrNum:0,wk1:0,mo1:0,mo3:0,bull:0,bear:0,liveP:0};
+  const liveP=(LP[t]?.p>0?LP[t].p:null)||s.base;
+  const pf={
+    NVDA:{tp:.11,sp:.045,e1:.022,e2:.010}, QQQ:{tp:.09,sp:.040,e1:.018,e2:.008},
+    AMD:{tp:.12,sp:.055,e1:.028,e2:.012},  AAPL:{tp:.07,sp:.025,e1:.015,e2:.007},
+    COIN:{tp:.15,sp:.065,e1:.032,e2:.015}, TSLA:{tp:.13,sp:.058,e1:.030,e2:.013},
+    META:{tp:.10,sp:.042,e1:.020,e2:.009}, MSFT:{tp:.08,sp:.035,e1:.017,e2:.008},
+    GOOGL:{tp:.09,sp:.038,e1:.019,e2:.009},SPY:{tp:.06,sp:.028,e1:.014,e2:.006},
+    AMZN:{tp:.10,sp:.044,e1:.022,e2:.010}, SMCI:{tp:.18,sp:.080,e1:.040,e2:.018},
+    PLTR:{tp:.14,sp:.060,e1:.030,e2:.014}, MSTR:{tp:.20,sp:.090,e1:.045,e2:.020},
+    SQQQ:{tp:.15,sp:.055,e1:.025,e2:.012}, IBIT:{tp:.14,sp:.062,e1:.031,e2:.014},
+    ARM:{tp:.13,sp:.055,e1:.027,e2:.012},  MRVL:{tp:.11,sp:.048,e1:.024,e2:.011},
+  }[t]||{tp:.10,sp:.045,e1:.022,e2:.010};
+  const dir=s.beh==='sell'?-1:1;
+  const target=+(liveP*(1+dir*pf.tp)).toFixed(2);
+  const stop=+(liveP*(1-dir*pf.sp)).toFixed(2);
+  const e1Lo=+(liveP*(1-pf.e1-.005)).toFixed(2);
+  const e1Hi=+(liveP*(1-pf.e1+.008)).toFixed(2);
+  const rrNum=+(Math.abs(target-liveP)/Math.abs(liveP-stop)).toFixed(1);
+  return {
+    target,stop,e1Lo,e1Hi,rr:`${rrNum}:1`,rrNum,liveP,
+    wk1:+(liveP*(1+dir*pf.tp*.35)).toFixed(2),
+    mo1:+(liveP*(1+dir*pf.tp*.65)).toFixed(2),
+    mo3:+(liveP*(1+dir*pf.tp)).toFixed(2),
+    bull:+(liveP*(1+dir*pf.tp*1.45)).toFixed(2),
+    bear:+(liveP*(1-pf.sp*1.2)).toFixed(2),
+  };
+}
+
+// ═══ calcLevels — مستويات ديناميكية ═══
+function calcLevels(t) {
+  const s=D[t];
+  if(!s) return {target:0,stop:0,e1Lo:0,e1Hi:0,rr:'—',rrNum:0,wk1:0,mo1:0,mo3:0,bull:0,bear:0,liveP:0};
+  const liveP=(LP[t]?.p>0?LP[t].p:null)||s.base;
+  const pf={
+    NVDA:{tp:.11,sp:.045},QQQ:{tp:.09,sp:.040},AMD:{tp:.12,sp:.055},
+    AAPL:{tp:.07,sp:.025},COIN:{tp:.15,sp:.065},TSLA:{tp:.13,sp:.058},
+    META:{tp:.10,sp:.042},MSFT:{tp:.08,sp:.035},GOOGL:{tp:.09,sp:.038},
+    SPY:{tp:.06,sp:.028},AMZN:{tp:.10,sp:.044},SMCI:{tp:.18,sp:.080},
+    PLTR:{tp:.14,sp:.060},MSTR:{tp:.20,sp:.090},SQQQ:{tp:.15,sp:.055},
+    IBIT:{tp:.14,sp:.062},ARM:{tp:.13,sp:.055},MRVL:{tp:.11,sp:.048},
+  }[t]||{tp:.10,sp:.045};
+  const dir=s.beh==='sell'?-1:1;
+  const target=+(liveP*(1+dir*pf.tp)).toFixed(2);
+  const stop=+(liveP*(1-dir*pf.sp)).toFixed(2);
+  const e1Lo=+(liveP*(1-pf.tp*.2-.005)).toFixed(2);
+  const e1Hi=+(liveP*(1-pf.tp*.2+.008)).toFixed(2);
+  const reward=Math.abs(target-liveP),risk=Math.abs(liveP-stop);
+  const rrNum=+(reward/risk).toFixed(1);
+  return {
+    target,stop,e1Lo,e1Hi,rr:`${rrNum}:1`,rrNum,liveP,
+    wk1:+(liveP*(1+dir*pf.tp*.35)).toFixed(2),
+    mo1:+(liveP*(1+dir*pf.tp*.65)).toFixed(2),
+    mo3:+(liveP*(1+dir*pf.tp)).toFixed(2),
+    bull:+(liveP*(1+dir*pf.tp*1.45)).toFixed(2),
+    bear:+(liveP*(1-pf.sp*1.2)).toFixed(2),
+  };
+}
 
 // ═══ SIGNALS TABLE ═══
 function buildSig(){
