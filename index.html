@@ -1382,13 +1382,13 @@ async function fetchPolygonPrices() {
         const chgPct    = prevClose ? (chgAmt/prevClose*100) : 0;
 
         LP[t].p      = livePrice;
-        LP[t].open   = day.o  || prevClose;
-        LP[t].high   = day.h  || livePrice;
-        LP[t].low    = day.l  || livePrice;
+        LP[t].open   = (day.o > 0 ? day.o : null) || snap.min?.o || prevClose;
+        LP[t].high   = (day.h > 0 ? day.h : null) || snap.min?.h || livePrice;
+        LP[t].low    = (day.l > 0 ? day.l : null) || snap.min?.l || livePrice;
         LP[t].prev   = prevClose;
-        LP[t].vol    = day.v  || 0;
-        LP[t].chgAmt = chgAmt;
-        LP[t].chgPct = chgPct;
+        LP[t].vol    = day.v || snap.min?.av || 0;
+        LP[t].chgAmt = livePrice - prevClose;
+        LP[t].chgPct = prevClose ? ((livePrice - prevClose)/prevClose*100) : 0;
         LP[t].source = 'live';
         LP[t].updated = new Date();
         // ✅ تحديث base بالسعر الحقيقي لكل الحسابات
@@ -1959,46 +1959,36 @@ async function analyzeOptions(){
   el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">🔍</div><div style="font-size:11px">يحلل البوت الذكي البيانات...</div></div>`;
 
   try {
-    // بيانات السوق الحقيقية
+    // الأسعار الحقيقية الحالية من LP
     const mktData=Object.entries(D).slice(0,10).map(([t,s])=>{
-      const lv=calcLevels(t);
-      return `${t}(${s.beh}): سعر $${lv.liveP.toFixed(0)}, هدف $${lv.target}, وقف $${lv.stop}, RSI:${s.mom.rsi}, MACD:${s.mom.macd>0?'صاعد':'هابط'}`;
+      const lp=LP[t];
+      const price=lp?.p>0?lp.p:s.base;
+      return `${t}: سعر $${price.toFixed(2)}, تغيير ${(lp?.chgPct||0).toFixed(2)}%, RSI:${s.mom.rsi}, MACD:${s.mom.macd>0?'صاعد':'هابط'}, سلوك:${s.beh}`;
     }).join('\n');
 
     const typeText=type==='call'?'Call فقط':type==='put'?'Put فقط':'Call و Put';
     const riskAmt=(capital*risk/100).toFixed(0);
 
-    const prompt=`أنت متداول خيارات محترف بخبرة 15 سنة تعمل كـ prop trader. مهمتك تقديم توصيات حقيقية قابلة للتنفيذ الفوري.
+    const prompt=`أنت prop trader محترف متخصص في عقود الخيارات الأمريكية.
 
-بيانات السوق الحالية:
+الأسعار الحقيقية اللحظية الآن:
 ${mktData}
 
-رأس المال المتاح: $${capital}
-الحد الأقصى للخسارة لكل صفقة: $${riskAmt} (${risk}%)
-نوع العقود: ${typeText}
-VIX: 18.4 | Fear & Greed: 62 (جشع — انتبه للتصحيحات)
-السوق: ما بعد الإغلاق — الجلسة القادمة غداً
+رأس المال: $${capital} | أقصى خسارة/صفقة: $${riskAmt} | نوع: ${typeText}
 
-قواعد الاختيار:
-1. اختر Strike قريب من السعر الحالي (ATM أو قريب منه) لأفضل نسبة Delta
-2. المدة الزمنية: 2-4 أسابيع كحد أدنى لتجنب Theta Decay
-3. احسب عدد العقود بدقة: (رأس المال × نسبة المخاطرة) ÷ (سعر العقد × 100)
-4. الهدف: 80-120% ربح من سعر الدخول
-5. وقف الخسارة: 40-50% من سعر الدخول
+قواعد صارمة يجب اتباعها:
+1. Strike: قريب جداً من السعر الحالي (ATM) أو بفارق 1-3% فقط
+2. Expiry: 14-28 يوم من اليوم (Jul 2025 فقط)
+3. Entry: سعر واقعي للعقد (2-5% من سعر السهم تقريباً)
+   مثال: NVDA بسعر $194 → Call $195 → entry ~$4-6
+   مثال: QQQ بسعر $715 → Call $717 → entry ~$8-12
+4. Contracts: floor($${riskAmt} ÷ (entry × 100)) — لا يقل عن 1
+5. Target: entry × 1.8 إلى 2.0
+6. StopLoss: entry × 0.5
 
-قدم 4 توصيات محددة وقابلة للتنفيذ. لكل توصية:
-- ticker: رمز السهم
-- type: CALL أو PUT
-- strike: سعر التنفيذ (رقم دقيق)
-- expiry: تاريخ الانتهاء مثل "Jul 18 2025"
-- entry: سعر الدخول المتوقع للعقد (رقم)
-- contracts: عدد العقود المحسوب بدقة
-- target: سعر الهدف للعقد (رقم)
-- stopLoss: وقف الخسارة للعقد (رقم)
-- reason: السبب التقني المحدد (مستوى الدعم/المقاومة، الإشارة التقنية)
-- confidence: نسبة الثقة بناءً على قوة الإشارات
-
-أجب بـ JSON مصفوفة فقط بدون أي نص إضافي.`;
+أعطني 4 توصيات فورية قابلة للتنفيذ اليوم بـ JSON:
+[{"ticker":"NVDA","type":"CALL","strike":195,"expiry":"Jul 18 2025","entry":4.50,"contracts":1,"target":8.50,"stopLoss":2.25,"reason":"كسر مقاومة + MACD صاعد","confidence":72}]
+JSON فقط بدون أي نص.`;
 
     const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
