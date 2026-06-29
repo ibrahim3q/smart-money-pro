@@ -1898,12 +1898,11 @@ async function loadNews(filter) {
       ?`أعطني 6 أخبار اقتصادية تؤثر على سوق الأسهم الأمريكي اليوم. لكل خبر: ticker="MARKET"، title، source، impact (صاعد/هابط/محايد)، desc. الإجابة JSON فقط.`
       :`أعطني 8 أخبار مؤثرة على السوق اليوم تشمل NVDA، AAPL، META، QQQ، TSLA، AMD وأخبار عامة. لكل خبر: ticker (رمز أو MARKET)، title، source، impact (صاعد/هابط/محايد)، desc. الإجابة JSON مصفوفة فقط.`;
 
-    const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,
-        system:"أنت محلل أخبار مالي. أجب فقط بـ JSON صالح بدون نص إضافي.",
-        messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    const text=data.content?.map(b=>b.text||'').join('')||'[]';
+    const text = await callClaude(
+      prompt,
+      'أنت محلل أخبار مالي. أجب فقط بـ JSON صالح بدون نص إضافي.',
+      1200
+    );
     const news=JSON.parse(text.replace(/```json|```/g,'').trim());
     renderNews(news);
   } catch(e) {
@@ -1945,6 +1944,23 @@ function filterNews(filter){
   document.querySelectorAll('#news-filter .chart-btn').forEach(b=>b.classList.remove('active'));
   if(event&&event.target) event.target.classList.add('active');
   loadNews(filter);
+}
+
+
+// ═══ استدعاء Claude عبر Vercel (يتجنب CORS) ═══
+async function callClaude(prompt, system, maxTokens) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      prompt: prompt,
+      system: system || 'أنت مساعد مالي متخصص. أجب بالعربية.',
+      max_tokens: maxTokens || 1000
+    })
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Claude API error');
+  return data.text;
 }
 
 // ═══════════════════════ OPTIONS ANALYZER ═══════════════════════
@@ -1990,28 +2006,11 @@ ${mktData}
 [{"ticker":"NVDA","type":"CALL","strike":195,"expiry":"Jul 18 2025","entry":4.50,"contracts":1,"target":8.50,"stopLoss":2.25,"reason":"كسر مقاومة + MACD صاعد","confidence":72}]
 JSON فقط بدون أي نص.`;
 
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "anthropic-version":"2023-06-01",
-        "anthropic-dangerous-direct-browser-access":"true"
-      },
-      body:JSON.stringify({
-        model:"claude-sonnet-4-6",
-        max_tokens:1500,
-        system:"أنت محلل عقود خيارات خبير. أجب فقط بـ JSON صالح بدون أي نص قبله أو بعده.",
-        messages:[{role:"user",content:prompt}]
-      })
-    });
-
-    if(!res.ok) {
-      const errData=await res.json().catch(()=>({}));
-      throw new Error(errData.error?.message||`HTTP ${res.status}`);
-    }
-
-    const data=await res.json();
-    const text=data.content?.map(b=>b.text||'').join('')||'[]';
+    const text = await callClaude(
+      prompt,
+      'أنت محلل عقود خيارات خبير. أجب فقط بـ JSON صالح بدون أي نص قبله أو بعده.',
+      1500
+    );
     const clean=text.replace(/```json|```/g,'').trim();
     const options=JSON.parse(clean);
 
@@ -2131,11 +2130,7 @@ async function runAI(){
   resp.style.display='flex';resp.className='ai-resp loading';
   resp.innerHTML='<div>تحليل Smart Money</div><div class="ald"><span></span><span></span><span></span></div>';
   try{
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:900,
-        system:`خبير أسواق مالية 15 سنة — Wyckoff، Dark Pools، Options Flow، Smart Money. أجب بالعربية. وضّح السلوك: شراء 🟢 أم بيع 🔴. كن محدداً وعملياً.`,
-        messages:[{role:"user",content:q}]})});
-    const d=await r.json();const t=d.content?.map(b=>b.text||'').join('')||'خطأ';
+    const t = await callClaude(q, 'خبير أسواق مالية 15 سنة — Wyckoff، Dark Pools، Options Flow، Smart Money. أجب بالعربية. وضّح السلوك: شراء 🟢 أم بيع 🔴. كن محدداً وعملياً.', 900);
     resp.style.display='block';resp.className='ai-resp';resp.textContent=t;
   }catch(e){resp.style.display='block';resp.className='ai-resp';resp.textContent='⚠️ خطأ في الاتصال.';}
   btn.disabled=false;btn.textContent='تحليل ⚡';
