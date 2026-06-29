@@ -2103,15 +2103,18 @@ async function bsend(msg){
   msgs.innerHTML+=`<div class="msg user">${q}</div>`;
   msgs.innerHTML+=`<div class="msg bot" id="bld" style="color:var(--tx3)"><div class="ald"><span></span><span></span><span></span></div></div>`;
   msgs.scrollTop=msgs.scrollHeight;
-  const topBuys=Object.entries(D).filter(([,s])=>s.beh==='buy').sort((a,b)=>b[1].mom.score-a[1].mom.score).slice(0,3).map(([t,s])=>`${t}(زخم:${s.mom.score}%,هدف:$${s.target},R:R:${s.rr})`).join(' | ');
+  const topBuys=Object.entries(D).filter(([,s])=>s.beh==='buy').sort((a,b)=>b[1].mom.score-a[1].mom.score).slice(0,3).map(([t,s])=>{
+    const lv=calcLevels(t);
+    return `${t}(سعر:$${lv.liveP.toFixed(0)},هدف:$${lv.target},R:R:${lv.rr})`;
+  }).join(' | ');
   const sess=getSess();
   try{
-    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,
-        system:`أنت Smart Money Bot متخصص في: مناطق الدخول المثالية، أفضل العقود والأسهم، تحليل الحيتان.\nالبيانات الحالية:\n- أفضل أسهم: ${topBuys}\n- أفضل عقود: NVDA $150C Jul18 ($3.8M) | QQQ $495C Jul18 ($5.2M) | META $540C Aug15 ($4.7M)\n- جلسة: ${sess.lbl} | Fear&Greed: 62 جشع\nأجب بالعربية. كن محدداً: اذكر منطقة الدخول والهدف والوقف. لا تحفظات مطولة.`,
-        messages:[{role:"user",content:q}]})});
-    const data=await r.json();
-    const text=data.content?.map(b=>b.text||'').join('')||'خطأ';
+    const botSystem=`أنت Smart Money Bot متخصص في: مناطق الدخول المثالية، أفضل العقود والأسهم، تحليل الحيتان.
+البيانات الحالية:
+- أفضل أسهم: ${topBuys}
+- جلسة: ${sess.lbl} | Fear&Greed: 62 جشع
+أجب بالعربية. كن محدداً: اذكر منطقة الدخول والهدف والوقف. لا تحفظات مطولة.`;
+    const text=await callClaude(q,botSystem,600);
     const ld=document.getElementById('bld');
     if(ld){ld.style.color='';ld.innerHTML=text.replace(/\n/g,'<br>');}
   }catch(e){
