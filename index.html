@@ -1376,7 +1376,7 @@ async function fetchPolygonPrices() {
         const prev  = snap.prevDay  || {};
         const last  = snap.lastTrade|| {};
 
-        const livePrice = last.p || day.c || snap.value || D[t].base;
+        const livePrice = last.p || (day.c > 0 ? day.c : null) || snap.min?.c || snap.value || D[t].base;
         const prevClose = prev.c || D[t].base;
         const chgAmt    = livePrice - prevClose;
         const chgPct    = prevClose ? (chgAmt/prevClose*100) : 0;
