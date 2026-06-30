@@ -784,13 +784,8 @@ body::before {
       <!-- VOLUME -->
       <div class="card mb14">
         <div class="card-stripe"></div>
-        <div class="card-title">📊 حجم غير طبيعي + تفسير السلوك</div>
-        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">NVDA</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:92%"></div></div><div class="vol-v">9.2x</div><div class="beh buy">🟢 تراكم</div></div>
-        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">META</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:80%"></div></div><div class="vol-v">8.0x</div><div class="beh buy">🟢 تراكم</div></div>
-        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">COIN</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:78%"></div></div><div class="vol-v">7.8x</div><div class="beh buy">🟢 عدواني</div></div>
-        <div class="vol-row"><div class="vol-t">AAPL</div><div class="vol-bar"><div class="vol-fill vf-bear" style="width:65%"></div></div><div class="vol-v">6.5x</div><div class="beh sell">🔴 توزيع</div></div>
-        <div class="vol-row"><div class="vol-t" style="color:var(--cyan)">GOOGL</div><div class="vol-bar"><div class="vol-fill vf-bull" style="width:60%"></div></div><div class="vol-v">6.0x</div><div class="beh buy">🟢 تراكم</div></div>
-        <div class="vol-row"><div class="vol-t">TSLA</div><div class="vol-bar"><div class="vol-fill vf-neu" style="width:38%"></div></div><div class="vol-v">3.8x</div><div class="beh watch">👁 انتظار</div></div>
+        <div class="card-title">📊 حجم التداول اللحظي</div>
+        <div id="vol-rows"><div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
       </div>
     </div>
 
@@ -929,6 +924,7 @@ body::before {
         <div class="card">
           <div class="card-stripe"></div>
           <div class="card-title">💰 تدفق الأوبشن الكبير</div>
+          <div style="font-size:8px;color:var(--orange);margin-bottom:8px;padding:6px 8px;background:rgba(255,159,67,.06);border-radius:6px;border:1px solid rgba(255,159,67,.15)">⚠️ بيانات توضيحية — يحتاج اشتراك Unusual Options Activity منفصل لبيانات حقيقية</div>
           <div class="flow-item"><div class="flow-badge fb-c">C</div><div style="flex:1"><div class="flow-tk">NVDA $150C Jul18</div><div class="flow-meta">IV 42% • 2,400 عقد<br>🟢 الحيتان يراهنون على الصعود</div></div><div class="flow-sz fs-b">$3.8M</div></div>
           <div class="flow-item"><div class="flow-badge fb-p">P</div><div style="flex:1"><div class="flow-tk">SPY $470P Jul11</div><div class="flow-meta">IV 18% • 5,100 عقد<br>🔴 تحوط مؤسسي من الهبوط</div></div><div class="flow-sz fs-s">$2.1M</div></div>
           <div class="flow-item"><div class="flow-badge fb-c">C</div><div style="flex:1"><div class="flow-tk">QQQ $495C Jul18</div><div class="flow-meta">IV 22% • 3,800 عقد<br>🟢 شراء مؤسسي على القطاع</div></div><div class="flow-sz fs-b">$5.2M</div></div>
@@ -951,6 +947,7 @@ body::before {
         <div class="card">
           <div class="card-stripe"></div>
           <div class="card-title">🏦 مشتريات المؤسسات 13F</div>
+          <div style="font-size:8px;color:var(--orange);margin-bottom:8px;padding:6px 8px;background:rgba(255,159,67,.06);border-radius:6px;border:1px solid rgba(255,159,67,.15)">⚠️ بيانات توضيحية — تقارير 13F الحقيقية تُنشر فصلياً عبر SEC EDGAR بتأخير حتى 45 يوماً</div>
           <table class="sig-tbl"><thead><tr><th>المؤسسة</th><th>السهم</th><th>التغيير</th><th>السلوك</th></tr></thead><tbody>
             <tr><td style="font-size:10px;font-weight:600">BlackRock</td><td><span class="tk">NVDA</span></td><td class="pn g">▲+$1.4B</td><td><div class="beh buy">🟢</div></td></tr>
             <tr><td style="font-size:10px;font-weight:600">Vanguard</td><td><span class="tk">META</span></td><td class="pn g">▲+$1.1B</td><td><div class="beh buy">🟢</div></td></tr>
@@ -963,6 +960,7 @@ body::before {
         <div class="card">
           <div class="card-stripe"></div>
           <div class="card-title">🕵️ Spoofing — الأوامر الخادعة</div>
+          <div style="font-size:8px;color:var(--orange);margin-bottom:8px;padding:6px 8px;background:rgba(255,159,67,.06);border-radius:6px;border:1px solid rgba(255,159,67,.15)">⚠️ بيانات توضيحية — يحتاج بيانات Level 2 / Order Book مكلفة جداً لرصد حقيقي</div>
           <table class="sig-tbl"><thead><tr><th>الرمز</th><th>النوع</th><th>الحجم</th><th>الهدف</th></tr></thead><tbody>
             <tr><td><span class="tk">NVDA</span></td><td><div class="beh sell" style="font-size:9px">بيع وهمي</div></td><td class="pn n">850K</td><td style="font-size:8px;color:var(--gold)">شراء أرخص</td></tr>
             <tr><td><span class="tk">QQQ</span></td><td><div class="beh buy" style="font-size:9px">شراء وهمي</div></td><td class="pn n">2.1M</td><td style="font-size:8px;color:var(--gold)">بيع أعلى</td></tr>
@@ -1570,13 +1568,14 @@ function buildPTable() {
   const sess = getSess();
   el.innerHTML = Object.entries(D).map(([t,s]) => {
     const lp = LP[t];
+    const lv = calcLevels(t);
     const pct = lp.chgPct||0;
     const amt = lp.chgAmt||0;
     const ext = sess.id==='pre'?lp.pre:lp.aft;
     const extPct = lp.prev>0?(ext-lp.prev)/lp.prev*100:0;
     const sc = s.mom.score;
     const mc = sc>65?'var(--green)':sc>40?'var(--orange)':'var(--red)';
-    const srcBadge = lp.source==='live'?'<span style="color:var(--green);font-size:7px">🟢 مباشر</span>':lp.source==='ext'?'<span style="color:var(--orange);font-size:7px">🟡 أمس</span>':'<span style="color:var(--red);font-size:7px">🔴 محاكاة</span>';
+    const srcBadge = lp.source==='live'?'<span style="color:var(--green);font-size:7px">🟢 لحظي</span>':lp.source==='ext'?'<span style="color:var(--orange);font-size:7px">🟡 أمس</span>':'<span style="color:var(--red);font-size:7px">🔴 محاكاة</span>';
     const volStr = lp.vol>1e6?(lp.vol/1e6).toFixed(1)+'M':lp.vol>1e3?(lp.vol/1e3).toFixed(0)+'K':lp.vol||'—';
     return `<tr>
       <td><span class="tk">${t}</span><div style="font-size:7px;color:var(--tx3)">${s.n}</div>${srcBadge}</td>
@@ -1591,8 +1590,8 @@ function buildPTable() {
       <td><div style="font-weight:700;font-size:9px;color:${mc}">${sc}%</div><div style="height:3px;background:var(--bd);border-radius:2px;margin-top:2px;width:48px"><div style="height:100%;width:${sc}%;background:${mc};border-radius:2px"></div></div><div style="font-size:7px;color:var(--tx3);margin-top:1px">${volStr}</div></td>
       <td><div class="beh ${s.beh}">${s.bl}</div></td>
       <td style="font-size:8px;color:var(--tx3)">${s.wy}</td>
-      <td class="pn g">$${s.target}</td>
-      <td class="pn r">$${s.stop}</td>
+      <td class="pn g">$${lv.target}</td>
+      <td class="pn r">$${lv.stop}</td>
     </tr>`;
   }).join('');
 }
@@ -1875,16 +1874,73 @@ function buildSig(){
 }
 
 // ═══ MAX PAIN ═══
+// ═══ VOLUME — حجم تداول حقيقي لحظي ═══
+// متوسط حجم يومي تقريبي معروف لكل سهم (مرجع تاريخي عام، يستخدم فقط كأساس مقارنة)
+const AVG_VOL = {
+  NVDA:180000000, QQQ:45000000, AMD:55000000, AAPL:55000000, COIN:12000000,
+  TSLA:80000000, META:18000000, MSFT:22000000, GOOGL:25000000, SPY:70000000,
+  AMZN:35000000, SMCI:8000000, PLTR:45000000, MSTR:6000000, SQQQ:25000000,
+  IBIT:30000000, ARM:8000000, MRVL:10000000
+};
+function buildVolRows(){
+  const el=document.getElementById('vol-rows'); if(!el) return;
+  const rows=Object.keys(D).map(t=>{
+    const vol=LP[t]?.vol||0;
+    const avg=AVG_VOL[t]||vol||1;
+    const ratio=avg>0?(vol/avg):0;
+    return {t,vol,ratio};
+  }).sort((a,b)=>b.ratio-a.ratio).slice(0,8);
+
+  if(rows.every(r=>r.vol===0)){
+    el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">⏳ في انتظار بيانات الحجم اللحظية</div>`;
+    return;
+  }
+
+  el.innerHTML=rows.map(r=>{
+    const ratioStr=r.ratio.toFixed(1)+'x';
+    const widthPct=Math.min(100,r.ratio*11);
+    const high=r.ratio>=1.5, low=r.ratio<0.7;
+    const fillClass=high?'vf-bull':low?'vf-neu':'vf-bull';
+    const behLabel=high?'<div class="beh buy">🟢 نشاط مرتفع</div>':low?'<div class="beh watch">👁 هادئ</div>':'<div class="beh watch">➡️ طبيعي</div>';
+    return `<div class="vol-row"><div class="vol-t" style="color:var(--cyan)">${r.t}</div><div class="vol-bar"><div class="vol-fill ${fillClass}" style="width:${widthPct}%"></div></div><div class="vol-v">${ratioStr}</div>${behLabel}</div>`;
+  }).join('');
+}
+
 function buildMP(){
-  const mp={QQQ:'$478',NVDA:'$140',SPY:'$530',META:'$510',GOOGL:'$170',AMD:'$155',AAPL:'$208'};
-  document.getElementById('mp-list').innerHTML=Object.entries(mp).map(([t,p])=>{
-    const cur=LP[t].p,mv=parseFloat(p.replace('$',''));
-    const diff=cur-mv;
-    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(28,45,64,.4)">
-      <span class="tk">${t}</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--orange)">${p}</span>
-      <span style="font-size:8px;color:var(--tx3)">${diff>0?`↓ ${diff.toFixed(0)}$ ضغط`:`↑ ${Math.abs(diff).toFixed(0)}$ دفع`}</span>
-    </div>`;}).join('');
+  const el=document.getElementById('mp-list'); if(!el) return;
+  const tickers=['QQQ','NVDA','SPY','META','GOOGL','AMD','AAPL'];
+  el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">⏳ جارٍ حساب Max Pain من بيانات الخيارات الحقيقية...</div>`;
+
+  // الجمعة القادمة
+  const today=new Date();
+  const nextFri=new Date(today);
+  nextFri.setDate(today.getDate()+((5-today.getDay()+7)%7||7));
+  const nextFriISO=nextFri.toISOString().slice(0,10);
+
+  Promise.allSettled(tickers.map(t=>
+    fetch(`/api/prices?type=maxpain&ticker=${t}&expiry=${nextFriISO}`).then(r=>r.json())
+  )).then(results=>{
+    const rows=results.map((r,i)=>{
+      const t=tickers[i];
+      const cur=LP[t]?.p||D[t]?.base||0;
+      if(r.status!=='fulfilled'||!r.value?.maxPain){
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(28,45,64,.4)">
+          <span class="tk">${t}</span>
+          <span style="font-size:9px;color:var(--tx3)">لا تتوفر بيانات</span>
+        </div>`;
+      }
+      const mp=r.value.maxPain;
+      const diff=cur-mp;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(28,45,64,.4)">
+        <span class="tk">${t}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--orange)">$${mp.toFixed(0)}</span>
+        <span style="font-size:8px;color:var(--tx3)">${diff>0?`↓ ${diff.toFixed(0)}$ ضغط`:`↑ ${Math.abs(diff).toFixed(0)}$ دفع`}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML=rows||'<div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">تعذر جلب البيانات</div>';
+  }).catch(()=>{
+    el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--red);font-size:10px">⚠️ خطأ في جلب Max Pain</div>`;
+  });
 }
 
 // ═══ WYCKOFF ═══
@@ -2413,13 +2469,14 @@ function checkTradeAlerts(){
 try{pickWy(document.querySelector('.wy-card'),'acc');}catch(e){}
 try{buildSig();}catch(e){}
 try{buildMP();}catch(e){}
+try{buildVolRows();}catch(e){}
 try{updSess();}catch(e){}
 try{checkTradeAlerts();}catch(e){}
 
 // ═══ POLLING ═══
 setTimeout(()=>{
   fetchPolygonPrices()
-    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} try{checkTradeAlerts();}catch(e){} })
+    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} try{buildVolRows();}catch(e){} try{checkTradeAlerts();}catch(e){} })
     .catch(e=>console.warn('init:',e));
 },800);
 
