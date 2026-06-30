@@ -112,15 +112,27 @@ export default async function handler(req, res) {
     if (type === 'options') {
       const t          = (ticker||'NVDA').toUpperCase();
       const optionType = (req.query.optionType||'call').toLowerCase(); // call | put
-      const expiry     = req.query.expiry || '';   // YYYY-MM-DD
+      let expiry       = req.query.expiry || '';   // YYYY-MM-DD
 
       try {
-        // جلب Options Chain من Polygon
-        let url = `${BASE}/v3/snapshot/options/${t}?contract_type=${optionType}&limit=10&apiKey=${API_KEY}`;
+        let url = `${BASE}/v3/snapshot/options/${t}?contract_type=${optionType}&limit=50&apiKey=${API_KEY}`;
         if (expiry) url += `&expiration_date=${expiry}`;
 
-        const r    = await fetch(url);
-        const data = await r.json();
+        let r    = await fetch(url);
+        let data = await r.json();
+
+        // لو لا توجد عقود للتاريخ المطلوب تحديداً، ابحث عن أقرب تاريخ متاح فعلياً
+        if ((data.results||[]).length === 0 && expiry) {
+          const url2 = `${BASE}/v3/snapshot/options/${t}?contract_type=${optionType}&limit=250&apiKey=${API_KEY}`;
+          const r2   = await fetch(url2);
+          const data2= await r2.json();
+          if ((data2.results||[]).length > 0) {
+            const allExpiries = data2.results.map(c=>c.details?.expiration_date).filter(Boolean).sort();
+            const nearestExpiry = allExpiries[0] || '';
+            data = { results: data2.results.filter(c=>c.details?.expiration_date===nearestExpiry) };
+            expiry = nearestExpiry;
+          }
+        }
 
         if (data.results?.length > 0) {
           const contracts = data.results.map(c => ({
