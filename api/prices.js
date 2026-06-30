@@ -166,14 +166,38 @@ export default async function handler(req, res) {
     // ── ٦. Max Pain — حساب حقيقي من Options Chain ────────────
     if (type === 'maxpain') {
       const t      = (ticker||'NVDA').toUpperCase();
-      const expiry = req.query.expiry || '';
+      let expiry   = req.query.expiry || '';
 
       try {
-        const callUrl = `${BASE}/v3/snapshot/options/${t}?contract_type=call&limit=250${expiry?`&expiration_date=${expiry}`:''}&apiKey=${API_KEY}`;
-        const putUrl  = `${BASE}/v3/snapshot/options/${t}?contract_type=put&limit=250${expiry?`&expiration_date=${expiry}`:''}&apiKey=${API_KEY}`;
+        let callUrl = `${BASE}/v3/snapshot/options/${t}?contract_type=call&limit=250&apiKey=${API_KEY}`;
+        let putUrl  = `${BASE}/v3/snapshot/options/${t}?contract_type=put&limit=250&apiKey=${API_KEY}`;
+        if (expiry) {
+          callUrl += `&expiration_date=${expiry}`;
+          putUrl  += `&expiration_date=${expiry}`;
+        }
 
-        const [callR, putR] = await Promise.all([fetch(callUrl), fetch(putUrl)]);
-        const [callD, putD] = await Promise.all([callR.json(), putR.json()]);
+        let [callR, putR] = await Promise.all([fetch(callUrl), fetch(putUrl)]);
+        let [callD, putD] = await Promise.all([callR.json(), putR.json()]);
+
+        // لو لا توجد نتائج لهذا التاريخ المحدد، جرب بدون قيد expiry وخذ أقرب تاريخ متاح
+        if ((callD.results||[]).length === 0 && (putD.results||[]).length === 0 && expiry) {
+          const callUrl2 = `${BASE}/v3/snapshot/options/${t}?contract_type=call&limit=250&apiKey=${API_KEY}`;
+          const putUrl2  = `${BASE}/v3/snapshot/options/${t}?contract_type=put&limit=250&apiKey=${API_KEY}`;
+          const [callR2, putR2] = await Promise.all([fetch(callUrl2), fetch(putUrl2)]);
+          const [callD2, putD2] = await Promise.all([callR2.json(), putR2.json()]);
+
+          if ((callD2.results||[]).length > 0 || (putD2.results||[]).length > 0) {
+            // اختر أقرب تاريخ انتهاء متوفر فعلياً من النتائج
+            const allExpiries = [...(callD2.results||[]), ...(putD2.results||[])]
+              .map(c=>c.details?.expiration_date).filter(Boolean).sort();
+            const nearestExpiry = allExpiries[0] || '';
+            callD = { results: (callD2.results||[]).filter(c=>c.details?.expiration_date===nearestExpiry) };
+            putD  = { results: (putD2.results||[]).filter(c=>c.details?.expiration_date===nearestExpiry) };
+            expiry = nearestExpiry;
+          } else {
+            callD = callD2; putD = putD2;
+          }
+        }
 
         // تشخيص: أرجع الخطأ الحقيقي من Polygon إذا فشل
         if (callD.status === 'ERROR' || putD.status === 'ERROR') {
@@ -222,7 +246,7 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({
-          type:'maxpain', ticker:t, maxPain:maxPainStrike,
+          type:'maxpain', ticker:t, maxPain:maxPainStrike, expiry,
           totalCallOI: calls.reduce((s,c)=>s+c.oi,0),
           totalPutOI: puts.reduce((s,p)=>s+p.oi,0),
         });
