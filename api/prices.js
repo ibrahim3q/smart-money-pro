@@ -175,6 +175,15 @@ export default async function handler(req, res) {
         const [callR, putR] = await Promise.all([fetch(callUrl), fetch(putUrl)]);
         const [callD, putD] = await Promise.all([callR.json(), putR.json()]);
 
+        // تشخيص: أرجع الخطأ الحقيقي من Polygon إذا فشل
+        if (callD.status === 'ERROR' || putD.status === 'ERROR') {
+          return res.status(200).json({
+            type:'maxpain', ticker:t, maxPain:null,
+            error:'polygon_error',
+            debug: { callStatus: callD.status, callMsg: callD.error || callD.message, putStatus: putD.status, putMsg: putD.error || putD.message }
+          });
+        }
+
         const calls = (callD.results||[]).map(c=>({
           strike: c.details?.strike_price||0,
           oi: c.open_interest||0
@@ -186,7 +195,10 @@ export default async function handler(req, res) {
         })).filter(c=>c.strike>0);
 
         if(calls.length===0 && puts.length===0){
-          return res.status(200).json({ type:'maxpain', ticker:t, maxPain:null, error:'no data' });
+          return res.status(200).json({
+            type:'maxpain', ticker:t, maxPain:null, error:'no data',
+            debug: { callResultsCount: (callD.results||[]).length, putResultsCount: (putD.results||[]).length, callStatus: callD.status, putStatus: putD.status, callRaw: JSON.stringify(callD).slice(0,300) }
+          });
         }
 
         // كل Strikes الفريدة
