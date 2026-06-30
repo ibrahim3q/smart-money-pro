@@ -1169,6 +1169,35 @@ body::before {
       </div>
     </div>
 
+    <!-- ══════════ JOURNAL — سجل الصفقات ══════════ -->
+    <div class="sec" id="sec-journal">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">📒 سجل الصفقات</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">تتبع أداءك الحقيقي — كل صفقة تحفظها هنا تبقى على جهازك</div>
+
+      <!-- ملخص الأداء -->
+      <div class="g4 mb14" id="journal-stats">
+        <div class="stat-card"><div class="stat-icon si-g">📊</div><div><div class="stat-val" id="js-total">0</div><div class="stat-lbl">إجمالي الصفقات</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-gr">✅</div><div><div class="stat-val" id="js-winrate">—</div><div class="stat-lbl">نسبة النجاح</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-c">💰</div><div><div class="stat-val" id="js-pnl">$0</div><div class="stat-lbl">صافي الربح/الخسارة</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-r">📉</div><div><div class="stat-val" id="js-avgrr">—</div><div class="stat-lbl">متوسط R:R</div></div></div>
+      </div>
+
+      <!-- جدول الصفقات -->
+      <div class="card">
+        <div class="card-stripe"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">📋 الصفقات المسجلة</div>
+          <button onclick="clearJournal()" style="padding:6px 12px;border-radius:6px;background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);color:var(--red);font-size:9px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif">🗑️ مسح الكل</button>
+        </div>
+        <div id="journal-list">
+          <div style="text-align:center;padding:30px;color:var(--tx3)">
+            <div style="font-size:24px;margin-bottom:8px">📭</div>
+            <div style="font-size:11px">لا توجد صفقات محفوظة — احفظ توصية من قسم الخيارات</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /app-content -->
 
   <!-- ─── BOTTOM NAV ─── -->
@@ -1177,11 +1206,11 @@ body::before {
     <div class="nav-item" onclick="goTo('livep')"><span class="nav-icon">💹</span><span class="nav-lbl">أسعار</span></div>
     <div class="nav-item" onclick="goTo('charts')"><span class="nav-icon">📈</span><span class="nav-lbl">بيانات</span></div>
     <div class="nav-item" onclick="goTo('signals')"><span class="nav-icon">🎯</span><span class="nav-lbl">إشارات</span></div>
-    <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
     <div class="nav-item" onclick="goTo('news')"><span class="nav-icon">📰</span><span class="nav-lbl">أخبار</span></div>
     <div class="nav-item" onclick="goTo('options')"><span class="nav-icon">💰</span><span class="nav-lbl">خيارات</span></div>
+    <div class="nav-item" onclick="goTo('journal')"><span class="nav-icon">📒</span><span class="nav-lbl">سجل</span></div>
     <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
-    <div class="nav-item" onclick="goTo('patterns')"><span class="nav-icon">🎭</span><span class="nav-lbl">أنماط</span></div>
+    <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
     <div class="nav-item" onclick="goTo('ai')"><span class="nav-icon">🤖</span><span class="nav-lbl">ذكاء</span></div>
   </nav>
 
@@ -1861,8 +1890,8 @@ const WD={
 function pickWy(el,k){document.querySelectorAll('.wy-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('wy-t').textContent=WD[k].t;document.getElementById('wy-b').textContent=WD[k].b;}
 
 // ═══ NAVIGATION ═══
-const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',whales:'تدفق الحيتان',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',wyckoff:'منهج Wyckoff',patterns:'أنماط التلاعب',ai:'المحلل الذكي'};
-const navOrder=['dashboard','livep','charts','signals','whales','news','options','wyckoff','patterns','ai'];
+const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',journal:'سجل الصفقات',wyckoff:'منهج Wyckoff',whales:'تدفق الحيتان',ai:'المحلل الذكي'};
+const navOrder=['dashboard','livep','charts','signals','news','options','journal','wyckoff','whales','ai'];
 
 function goTo(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1879,6 +1908,7 @@ function goTo(id){
   if(id==='charts') setTimeout(()=>selStock(CT||'NVDA'),100);
   if(id==='livep'){ buildLPGrid(); buildPTable(); }
   if(id==='news') setTimeout(()=>loadNews('all'),200);
+  if(id==='journal') renderJournal();
 }
 
 // ═══════════════════════ NEWS — الأخبار ═══════════════════════
@@ -2001,18 +2031,32 @@ async function analyzeOptions(){
         const d=await r.json();
         if(d.contracts?.length>0){
           const stockPrice=LP[t]?.p||D[t].base;
-          const atm=d.contracts.reduce((best,c)=>
-            Math.abs(c.strike-stockPrice)<Math.abs(best.strike-stockPrice)?c:best
-          ,d.contracts[0]);
+          // رتب حسب الأقرب لـ ATM
+          const sorted=[...d.contracts].sort((a,b)=>
+            Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice)
+          );
+          // ابحث عن أول عقد بسيولة كافية (سبريد معقول + حجم/OI كافٍ)
+          const liquid=sorted.find(c=>{
+            const mid=c.midpoint>0?c.midpoint:((c.bid+c.ask)/2);
+            if(mid<=0||c.bid<=0||c.ask<=0) return false;
+            const spreadPct=((c.ask-c.bid)/mid)*100;
+            const hasVolume=(c.volume>=50)||(c.openInterest>=100);
+            return spreadPct<=15 && hasVolume;
+          });
+          const atm=liquid||sorted[0];
           const mid=atm.midpoint>0?atm.midpoint:((atm.bid+atm.ask)/2);
+          const spreadPct=mid>0?(((atm.ask-atm.bid)/mid)*100):999;
           if(mid>0) optionsData[t]={
             strike:atm.strike,
             entry:+mid.toFixed(2),
             bid:atm.bid,ask:atm.ask,
+            spreadPct:+spreadPct.toFixed(1),
+            isLiquid:!!liquid,
             iv:+(atm.iv*100).toFixed(1),
             delta:+atm.delta.toFixed(2),
             theta:+atm.theta.toFixed(3),
             volume:atm.volume,
+            openInterest:atm.openInterest,
             expiry:atm.expiry||nextFriISO,
             stockPrice
           };
@@ -2024,7 +2068,7 @@ async function analyzeOptions(){
     const hasRealData=Object.keys(optionsData).length>0;
     const realPricesText=hasRealData
       ?Object.entries(optionsData).map(([t,o])=>
-        `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike ATM $${o.strike}, سعر العقد الحقيقي $${o.entry} (bid:${o.bid} ask:${o.ask}), IV:${o.iv}%, Delta:${o.delta}, Theta:${o.theta}/يوم`
+        `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike ATM $${o.strike}, سعر $${o.entry} (bid:${o.bid} ask:${o.ask}, سبريد:${o.spreadPct}%${o.isLiquid?' ✅سيولة جيدة':' ⚠️سيولة ضعيفة'}), IV:${o.iv}%, Delta:${o.delta}, حجم:${o.volume}, OI:${o.openInterest}`
       ).join('\n')
       :'لم تتوفر أسعار حقيقية — استخدم تقديرات بناءً على الأسعار الحالية';
 
@@ -2051,6 +2095,7 @@ ${realPricesText}
 4. Target: entry × 1.20 (20% ربح)
 5. StopLoss: entry × 0.90 (10% خسارة)
 6. Contracts: floor($${riskAmt} ÷ (entry × 100))
+7. ⚠️ تجنب تماماً أي عقد بسيولة ضعيفة (سبريد > 15% أو حجم/OI منخفض) — لا توصي به حتى لو كانت الإشارة التقنية قوية
 
 أعطني 4 توصيات JSON فقط:
 [{"ticker":"NVDA","type":"CALL","strike":195,"expiry":"${nextFriStr}","entry":3.50,"contracts":1,"target":4.20,"stopLoss":3.15,"reason":"ATM + Delta 0.50 + IV مناسب","confidence":75}]`;
@@ -2083,6 +2128,7 @@ ${realPricesText}
 function renderOptions(options,capital,risk){
   const el=document.getElementById('opt-results'); if(!el) return;
   const riskAmt=capital*risk/100;
+  window._lastOptions = options; // لحفظها في السجل لاحقاً
 
   // بطاقة الملخص
   let html = '<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">';
@@ -2092,7 +2138,7 @@ function renderOptions(options,capital,risk){
   html += '</div>';
 
   // بطاقة كل عقد
-  options.forEach(function(o) {
+  options.forEach(function(o,idx) {
     const isCall = (o.type||'').toUpperCase() === 'CALL';
     const bc = isCall ? 'rgba(0,230,118,.25)' : 'rgba(255,69,96,.25)';
     const bg = isCall ? 'rgba(0,230,118,.15)' : 'rgba(255,69,96,.15)';
@@ -2125,11 +2171,14 @@ function renderOptions(options,capital,risk){
     html += '</div>';
 
     // إجماليات
-    html += '<div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px">';
+    html += '<div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px;margin-bottom:8px">';
     html += '<span style="font-size:9px;color:var(--tx3)">💵 التكلفة: <span style="color:var(--tx);font-weight:700">$'+totalCost+'</span></span>';
     html += '<span style="font-size:9px;color:var(--tx3)">🎯 الهدف: <span style="color:var(--green);font-weight:700">$'+totalTarget+'</span></span>';
     html += '<span style="font-size:9px;color:var(--tx3)">🛑 الخسارة: <span style="color:var(--red);font-weight:700">$'+totalStop+'</span></span>';
     html += '</div>';
+
+    // زر حفظ في السجل
+    html += '<button onclick="saveToJournal('+idx+')" style="width:100%;padding:9px;border-radius:7px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:\'IBM Plex Sans Arabic\',sans-serif">📒 حفظ في سجل الصفقات</button>';
 
     html += '</div>';
   });
@@ -2197,6 +2246,108 @@ document.getElementById('ai-inp').addEventListener('keypress',e=>{if(e.key==='En
 
 // ═══ CHECKBOX ═══
 function tc(el){el.classList.toggle('checked');el.textContent=el.classList.contains('checked')?'✓':'';}
+
+// ═══ JOURNAL — سجل الصفقات (localStorage) ═══
+const JKEY='smp_journal';
+
+function getJournal(){
+  try{ return JSON.parse(localStorage.getItem(JKEY)||'[]'); }catch(e){ return []; }
+}
+function setJournal(arr){
+  try{ localStorage.setItem(JKEY, JSON.stringify(arr)); }catch(e){}
+}
+
+function saveToJournal(idx){
+  const o = window._lastOptions?.[idx];
+  if(!o) return;
+  const entry = {
+    id: Date.now(),
+    ticker: o.ticker, type: o.type, strike: o.strike, expiry: o.expiry,
+    entry: o.entry, contracts: o.contracts, target: o.target, stopLoss: o.stopLoss,
+    reason: o.reason, confidence: o.confidence,
+    savedAt: new Date().toISOString(),
+    status: 'open', // open | win | loss
+    exitPrice: null
+  };
+  const j = getJournal();
+  j.unshift(entry);
+  setJournal(j);
+  alert('✅ تم الحفظ في سجل الصفقات');
+}
+
+function renderJournal(){
+  const j = getJournal();
+  const listEl = document.getElementById('journal-list');
+  if(!listEl) return;
+
+  // إحصائيات
+  const total = j.length;
+  const closed = j.filter(t=>t.status!=='open');
+  const wins = j.filter(t=>t.status==='win').length;
+  const winRate = closed.length>0 ? ((wins/closed.length)*100).toFixed(0)+'%' : '—';
+  let pnl = 0;
+  closed.forEach(t=>{
+    const diff = (t.exitPrice - t.entry) * t.contracts * 100;
+    pnl += diff;
+  });
+  const avgRR = j.length>0
+    ? (j.reduce((s,t)=>s+Math.abs((t.target-t.entry)/(t.entry-t.stopLoss)),0)/j.length).toFixed(1)+':1'
+    : '—';
+
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('js-total', total);
+  set('js-winrate', winRate);
+  set('js-pnl', (pnl>=0?'+':'')+'$'+pnl.toFixed(0));
+  const pnlEl=document.getElementById('js-pnl');
+  if(pnlEl) pnlEl.style.color = pnl>=0 ? 'var(--green)' : 'var(--red)';
+  set('js-avgrr', avgRR);
+
+  if(j.length===0){
+    listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">📭</div><div style="font-size:11px">لا توجد صفقات محفوظة — احفظ توصية من قسم الخيارات</div></div>`;
+    return;
+  }
+
+  listEl.innerHTML = j.map(t=>{
+    const isCall = (t.type||'').toUpperCase()==='CALL';
+    const statusColor = t.status==='win'?'var(--green)':t.status==='loss'?'var(--red)':'var(--orange)';
+    const statusText = t.status==='win'?'🟢 ربح':t.status==='loss'?'🔴 خسارة':'⏳ مفتوحة';
+    const date = new Date(t.savedAt).toLocaleDateString('ar-SA',{month:'short',day:'numeric'});
+    return `<div style="background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--cyan)">${t.ticker} $${t.strike} ${(t.type||'').toUpperCase()} ${t.expiry}</div>
+        <div style="font-size:9px;font-weight:700;color:${statusColor}">${statusText}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;font-size:8px;color:var(--tx3)">
+        <div>دخول: <span style="color:var(--gold);font-weight:700">$${t.entry}</span></div>
+        <div>هدف: <span style="color:var(--green);font-weight:700">$${t.target}</span></div>
+        <div>وقف: <span style="color:var(--red);font-weight:700">$${t.stopLoss}</span></div>
+        <div>عقود: <span style="color:var(--tx);font-weight:700">${t.contracts}</span></div>
+      </div>
+      <div style="font-size:8px;color:var(--tx3);margin-bottom:8px">${date} — ${t.reason||''}</div>
+      ${t.status==='open'?`
+      <div style="display:flex;gap:6px">
+        <button onclick="closeTrade(${t.id},'win')" style="flex:1;padding:7px;border-radius:6px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.2);color:var(--green);font-size:9px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif">✅ أغلقت بربح (الهدف)</button>
+        <button onclick="closeTrade(${t.id},'loss')" style="flex:1;padding:7px;border-radius:6px;background:rgba(255,69,96,.1);border:1px solid rgba(255,69,96,.2);color:var(--red);font-size:9px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif">🛑 أغلقت بخسارة (الوقف)</button>
+      </div>`:`<div style="font-size:8px;color:var(--tx3)">سعر الخروج: $${t.exitPrice}</div>`}
+    </div>`;
+  }).join('');
+}
+
+function closeTrade(id, result){
+  const j = getJournal();
+  const trade = j.find(t=>t.id===id);
+  if(!trade) return;
+  trade.status = result;
+  trade.exitPrice = result==='win' ? trade.target : trade.stopLoss;
+  setJournal(j);
+  renderJournal();
+}
+
+function clearJournal(){
+  if(!confirm('هل تريد مسح كل سجل الصفقات؟ لا يمكن التراجع.')) return;
+  setJournal([]);
+  renderJournal();
+}
 
 // ═══ CLOCK ═══
 function tick(){
