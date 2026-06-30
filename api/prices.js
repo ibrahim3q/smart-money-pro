@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   try {
 
-    // ── ١. أسعار لحظية Snapshot (default) ──────────────────
+    // ── ١. أسعار لحظية Snapshot ──────────────────
     if (!type || type === 'snapshot') {
       const url  = `${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${tickers}&apiKey=${API_KEY}`;
       const r    = await fetch(url);
@@ -80,14 +80,12 @@ export default async function handler(req, res) {
     if (type === 'market') {
       let vix = null, fearGreed = null;
 
-      // VIX
       try {
-        const vr   = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY&apiKey=${API_KEY}`);
-        const vd   = await vr.json();
+        const vr = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=VIXY&apiKey=${API_KEY}`);
+        const vd = await vr.json();
         vix = vd?.tickers?.[0]?.day?.c || null;
       } catch(e) {}
 
-      // Fear & Greed من CNN
       try {
         const fgR = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
           headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}
@@ -98,7 +96,6 @@ export default async function handler(req, res) {
         }
       } catch(e) {}
 
-      // Fallback: احسب من SPY
       if(!fearGreed) {
         try {
           const sr  = await fetch(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=SPY&apiKey=${API_KEY}`);
@@ -109,6 +106,61 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({ type:'market', vix, fearGreed });
+    }
+
+    // ── ٥. Options Chain — أسعار العقود الحقيقية ─────────────
+    if (type === 'options') {
+      const t          = (ticker||'NVDA').toUpperCase();
+      const optionType = (req.query.optionType||'call').toLowerCase(); // call | put
+      const expiry     = req.query.expiry || '';   // YYYY-MM-DD
+
+      try {
+        // جلب Options Chain من Polygon
+        let url = `${BASE}/v3/snapshot/options/${t}?contract_type=${optionType}&limit=10&apiKey=${API_KEY}`;
+        if (expiry) url += `&expiration_date=${expiry}`;
+
+        const r    = await fetch(url);
+        const data = await r.json();
+
+        if (data.results?.length > 0) {
+          const contracts = data.results.map(c => ({
+            ticker:       c.details?.ticker         || '',
+            strike:       c.details?.strike_price   || 0,
+            expiry:       c.details?.expiration_date|| '',
+            type:         c.details?.contract_type  || '',
+            // أسعار حقيقية
+            lastPrice:    c.last_quote?.midpoint || c.day?.close || 0,
+            bid:          c.last_quote?.bid      || 0,
+            ask:          c.last_quote?.ask      || 0,
+            midpoint:     c.last_quote?.midpoint || 0,
+            // Greeks
+            delta:        c.greeks?.delta  || 0,
+            gamma:        c.greeks?.gamma  || 0,
+            theta:        c.greeks?.theta  || 0,
+            vega:         c.greeks?.vega   || 0,
+            iv:           c.implied_volatility || 0,
+            // حجم التداول
+            volume:       c.day?.volume    || 0,
+            openInterest: c.open_interest  || 0,
+            // السعر الحالي للسهم
+            underlyingPrice: c.underlying_asset?.price || 0,
+          }));
+
+          return res.status(200).json({
+            type: 'options',
+            ticker: t,
+            optionType,
+            expiry,
+            contracts,
+            count: contracts.length
+          });
+        }
+
+        return res.status(200).json({ type:'options', ticker:t, contracts:[], count:0 });
+
+      } catch(e) {
+        return res.status(200).json({ type:'options', ticker:t, contracts:[], count:0, error:e.message });
+      }
     }
 
     res.status(400).json({ error:'unknown type' });
