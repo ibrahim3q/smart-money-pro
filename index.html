@@ -737,6 +737,9 @@ body::before {
 
     <!-- ══════════ DASHBOARD ══════════ -->
     <div class="sec active" id="sec-dashboard">
+      <!-- تنبيه الصفقات الحية -->
+      <div id="trade-alert-banner" style="display:none;margin-bottom:14px"></div>
+
       <div class="g4 mb14">
         <div class="stat-card"><div class="stat-icon si-g">🐋</div><div><div class="stat-val">$2.8B</div><div class="stat-lbl">تدفق مؤسسي</div><div class="stat-ch up">▲ صافي شراء</div></div></div>
         <div class="stat-card"><div class="stat-icon si-c">📊</div><div><div class="stat-val">0.73</div><div class="stat-lbl">Put/Call</div><div class="stat-ch wa">⚠️ جشع</div></div></div>
@@ -1208,7 +1211,7 @@ body::before {
     <div class="nav-item" onclick="goTo('signals')"><span class="nav-icon">🎯</span><span class="nav-lbl">إشارات</span></div>
     <div class="nav-item" onclick="goTo('news')"><span class="nav-icon">📰</span><span class="nav-lbl">أخبار</span></div>
     <div class="nav-item" onclick="goTo('options')"><span class="nav-icon">💰</span><span class="nav-lbl">خيارات</span></div>
-    <div class="nav-item" onclick="goTo('journal')"><span class="nav-icon">📒</span><span class="nav-lbl">سجل</span></div>
+    <div class="nav-item" onclick="goTo('journal')" style="position:relative"><span class="nav-icon">📒</span><span class="nav-lbl">سجل</span><div id="journal-alert-badge" style="display:none;position:absolute;top:2px;left:8px;width:9px;height:9px;background:var(--red);border-radius:50%;border:1.5px solid var(--bg);animation:blink 1.5s infinite"></div></div>
     <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
     <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
     <div class="nav-item" onclick="goTo('ai')"><span class="nav-icon">🤖</span><span class="nav-lbl">ذكاء</span></div>
@@ -1404,13 +1407,17 @@ async function fetchPolygonPrices() {
         const day   = snap.day      || {};
         const prev  = snap.prevDay  || {};
         const last  = snap.lastTrade|| {};
+        const quote = snap.lastQuote|| {};
 
-        const livePrice = last.p || (day.c > 0 ? day.c : null) || snap.min?.c || snap.value || D[t].base;
+        // الآن مع الاشتراك المدفوع: lastTrade.p هو السعر اللحظي الحقيقي
+        const livePrice = last.p || quote.p || (day.c > 0 ? day.c : null) || snap.min?.c || snap.value || D[t].base;
         const prevClose = prev.c || D[t].base;
         const chgAmt    = livePrice - prevClose;
         const chgPct    = prevClose ? (chgAmt/prevClose*100) : 0;
 
         LP[t].p      = livePrice;
+        LP[t].bid    = quote.p  || 0;  // bid حقيقي
+        LP[t].ask    = quote.P  || 0;  // ask حقيقي
         LP[t].open   = (day.o > 0 ? day.o : null) || snap.min?.o || prevClose;
         LP[t].high   = (day.h > 0 ? day.h : null) || snap.min?.h || livePrice;
         LP[t].low    = (day.l > 0 ? day.l : null) || snap.min?.l || livePrice;
@@ -1512,7 +1519,7 @@ function showPriceStatus(src) {
   const el = document.getElementById('lup-time');
   if(!el) return;
   const now = new Date().toLocaleTimeString('ar');
-  if(src==='live')    el.textContent = `🟢 بيانات حقيقية — ${now}`;
+  if(src==='live')    el.textContent = `🟢 لحظي حقيقي (Real-time) — ${now}`;
   else if(src==='ext') el.textContent = `🟡 إغلاق أمس — ${now}`;
   else if(src==='loading') el.textContent = `⏳ جارٍ التحديث...`;
   else el.textContent = `🔴 محاكاة — ${now}`;
@@ -2272,6 +2279,7 @@ function saveToJournal(idx){
   const j = getJournal();
   j.unshift(entry);
   setJournal(j);
+  checkTradeAlerts();
   alert('✅ تم الحفظ في سجل الصفقات');
 }
 
@@ -2341,6 +2349,7 @@ function closeTrade(id, result){
   trade.exitPrice = result==='win' ? trade.target : trade.stopLoss;
   setJournal(j);
   renderJournal();
+  checkTradeAlerts();
 }
 
 function clearJournal(){
@@ -2357,22 +2366,67 @@ function tick(){
 }
 setInterval(tick,1000); tick();
 
+// ═══ TRADE ALERTS — تنبيهات الصفقات المفتوحة ═══
+function checkTradeAlerts(){
+  const j = getJournal();
+  const openTrades = j.filter(t=>t.status==='open');
+  const badge = document.getElementById('journal-alert-badge');
+  const banner = document.getElementById('trade-alert-banner');
+  if(!openTrades.length){
+    if(badge) badge.style.display='none';
+    if(banner) banner.style.display='none';
+    return;
+  }
+
+  // نقدر سعر السهم الحالي من LP باستخدام رمز السهم في الصفقة
+  const alerts = [];
+  openTrades.forEach(t=>{
+    const stockPrice = LP[t.ticker]?.p;
+    if(!stockPrice) return;
+    // تقدير تقريبي لمدى قرب السعر من نقطة الكسر بناءً على Strike (ATM)
+    const distToStrikePct = Math.abs((stockPrice - t.strike)/t.strike*100);
+    if(distToStrikePct <= 0.5){
+      alerts.push({trade:t, type:'near', msg:`${t.ticker} اقترب جداً من Strike $${t.strike} — راقب العقد الآن`});
+    }
+  });
+
+  if(alerts.length>0){
+    if(badge) badge.style.display='block';
+    if(banner){
+      banner.style.display='block';
+      banner.innerHTML = `<div style="background:rgba(255,159,67,.1);border:1px solid rgba(255,159,67,.3);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+        <div style="font-size:20px">🔔</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;color:var(--orange);margin-bottom:2px">تنبيه صفقات مفتوحة (${alerts.length})</div>
+          <div style="font-size:9px;color:var(--tx2)">${alerts.map(a=>a.msg).join(' • ')}</div>
+        </div>
+        <button onclick="goTo('journal')" style="padding:7px 14px;border-radius:7px;background:rgba(255,159,67,.15);border:1px solid rgba(255,159,67,.3);color:var(--orange);font-size:9px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;white-space:nowrap">عرض السجل</button>
+      </div>`;
+    }
+  } else {
+    if(badge) badge.style.display = openTrades.length>0 ? 'block' : 'none';
+    if(banner) banner.style.display='none';
+  }
+}
+
 // ═══ INIT ═══
 try{pickWy(document.querySelector('.wy-card'),'acc');}catch(e){}
 try{buildSig();}catch(e){}
 try{buildMP();}catch(e){}
 try{updSess();}catch(e){}
+try{checkTradeAlerts();}catch(e){}
 
 // ═══ POLLING ═══
 setTimeout(()=>{
   fetchPolygonPrices()
-    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} })
+    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} try{checkTradeAlerts();}catch(e){} })
     .catch(e=>console.warn('init:',e));
 },800);
 
 function startPolygonPolling(){
   const sess=getSess().id;
-  const iv=sess==='open'?15000:sess==='pre'||sess==='after'?30000:60000;
+  // الآن مع البيانات اللحظية الحقيقية: تحديث أسرع أثناء التداول
+  const iv=sess==='open'?8000:sess==='pre'||sess==='after'?20000:60000;
   setTimeout(async()=>{
     try{
       await fetchPolygonPrices();
@@ -2387,6 +2441,7 @@ function startPolygonPolling(){
         if(cel){cel.textContent=(pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';cel.className='pr-chg '+(pct>=0?'up':'dn');}
       }
       try{buildSig();}catch(e){}
+      try{checkTradeAlerts();}catch(e){}
     }catch(e){console.warn('poll:',e);}
     startPolygonPolling();
   },iv);
