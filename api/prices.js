@@ -163,6 +163,63 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── ٦. Max Pain — حساب حقيقي من Options Chain ────────────
+    if (type === 'maxpain') {
+      const t      = (ticker||'NVDA').toUpperCase();
+      const expiry = req.query.expiry || '';
+
+      try {
+        const callUrl = `${BASE}/v3/snapshot/options/${t}?contract_type=call&limit=250${expiry?`&expiration_date=${expiry}`:''}&apiKey=${API_KEY}`;
+        const putUrl  = `${BASE}/v3/snapshot/options/${t}?contract_type=put&limit=250${expiry?`&expiration_date=${expiry}`:''}&apiKey=${API_KEY}`;
+
+        const [callR, putR] = await Promise.all([fetch(callUrl), fetch(putUrl)]);
+        const [callD, putD] = await Promise.all([callR.json(), putR.json()]);
+
+        const calls = (callD.results||[]).map(c=>({
+          strike: c.details?.strike_price||0,
+          oi: c.open_interest||0
+        })).filter(c=>c.strike>0);
+
+        const puts = (putD.results||[]).map(c=>({
+          strike: c.details?.strike_price||0,
+          oi: c.open_interest||0
+        })).filter(c=>c.strike>0);
+
+        if(calls.length===0 && puts.length===0){
+          return res.status(200).json({ type:'maxpain', ticker:t, maxPain:null, error:'no data' });
+        }
+
+        // كل Strikes الفريدة
+        const strikes = [...new Set([...calls.map(c=>c.strike), ...puts.map(p=>p.strike)])].sort((a,b)=>a-b);
+
+        // لكل Strike مفترض كسعر إغلاق، احسب إجمالي الخسارة لحاملي العقود (pain)
+        let minPain = Infinity, maxPainStrike = strikes[0]||0;
+        for(const assumedPrice of strikes){
+          let totalPain = 0;
+          // Calls: تخسر قيمتها إن أغلق السعر تحت الـ Strike (OTM) - لكن الكاتب يربح؛ pain لحامل call = max(0, strike-price)*oi لو ITM
+          calls.forEach(c=>{
+            if(assumedPrice > c.strike) totalPain += (assumedPrice - c.strike) * c.oi;
+          });
+          puts.forEach(p=>{
+            if(assumedPrice < p.strike) totalPain += (p.strike - assumedPrice) * p.oi;
+          });
+          if(totalPain < minPain){
+            minPain = totalPain;
+            maxPainStrike = assumedPrice;
+          }
+        }
+
+        return res.status(200).json({
+          type:'maxpain', ticker:t, maxPain:maxPainStrike,
+          totalCallOI: calls.reduce((s,c)=>s+c.oi,0),
+          totalPutOI: puts.reduce((s,p)=>s+p.oi,0),
+        });
+
+      } catch(e) {
+        return res.status(200).json({ type:'maxpain', ticker:t, maxPain:null, error:e.message });
+      }
+    }
+
     res.status(400).json({ error:'unknown type' });
 
   } catch(err) {
