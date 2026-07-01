@@ -2192,6 +2192,8 @@ function renderOptions(options,capital,risk){
   const el=document.getElementById('opt-results'); if(!el) return;
   const riskAmt=capital*risk/100;
   window._lastOptions = options; // لحفظها في السجل لاحقاً
+  window._optionsPrices = {};
+  options.forEach(o=>{ if(LP[o.ticker]?.p) window._optionsPrices[o.ticker]=LP[o.ticker].p; });
 
   // بطاقة الملخص
   let html = '<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">';
@@ -2233,7 +2235,47 @@ function renderOptions(options,capital,risk){
     html += '<div style="background:rgba(255,69,96,.06);border:1px solid rgba(255,69,96,.15);border-radius:7px;padding:8px;text-align:center"><div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;color:var(--red)">$'+o.stopLoss+'</div><div style="font-size:7px;color:var(--red);margin-top:2px">-'+lossPct+'% وقف</div></div>';
     html += '</div>';
 
+    // مقارنة السعر الحالي للسهم مقابل وقت التوصية
+    const liveStockPrice = LP[o.ticker]?.p || 0;
+    const stockAtAnalysis = window._optionsPrices?.[o.ticker] || 0;
+    let priceAlertHtml = '';
+    if(liveStockPrice > 0 && o.entry > 0) {
+      // تقدير تقريبي: هل السعر الحالي للعقد ارتفع أم انخفض عن الدخول المقترح؟
+      const liveVsEntry = liveStockPrice > 0 && stockAtAnalysis > 0
+        ? ((liveStockPrice - stockAtAnalysis) / stockAtAnalysis * 100).toFixed(2)
+        : null;
+      if(liveVsEntry !== null) {
+        const moved = parseFloat(liveVsEntry);
+        if(isCall && moved > 2) {
+          priceAlertHtml = `<div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:8px 10px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px">⚠️</span>
+            <div><div style="font-size:9px;font-weight:700;color:var(--red)">السعر تجاوز نقطة الدخول</div>
+            <div style="font-size:8px;color:var(--tx3)">السهم ارتفع ${moved}%+ منذ التحليل — سعر العقد أعلى الآن، راجع قبل الدخول</div></div>
+          </div>`;
+        } else if(!isCall && moved < -2) {
+          priceAlertHtml = `<div style="background:rgba(255,69,96,.08);border:1px solid rgba(255,69,96,.2);border-radius:7px;padding:8px 10px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px">⚠️</span>
+            <div><div style="font-size:9px;font-weight:700;color:var(--red)">السعر تجاوز نقطة الدخول (Put)</div>
+            <div style="font-size:8px;color:var(--tx3)">السهم انخفض ${Math.abs(moved)}%+ منذ التحليل — سعر الـ Put أعلى الآن، راجع قبل الدخول</div></div>
+          </div>`;
+        } else if(isCall && moved < -1) {
+          priceAlertHtml = `<div style="background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);border-radius:7px;padding:8px 10px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px">✅</span>
+            <div><div style="font-size:9px;font-weight:700;color:var(--green)">فرصة جيدة — السعر انخفض منذ التحليل</div>
+            <div style="font-size:8px;color:var(--tx3)">السهم انخفض ${Math.abs(moved)}% — العقد أرخص الآن من وقت التوصية</div></div>
+          </div>`;
+        }
+      }
+      // اعرض السعر الحالي للسهم دائماً
+      priceAlertHtml += `<div style="background:var(--s2);border-radius:7px;padding:7px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;color:var(--tx3)">السعر الحالي للسهم:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--cyan)">$${liveStockPrice.toFixed(2)}</span>
+        <span style="font-size:8px;color:var(--tx3)">وقت التحليل: $${stockAtAnalysis.toFixed(2)||'—'}</span>
+      </div>`;
+    }
+
     // إجماليات
+    html += priceAlertHtml;
     html += '<div style="display:flex;justify-content:space-between;background:var(--s2);border-radius:7px;padding:7px 10px;margin-bottom:8px">';
     html += '<span style="font-size:9px;color:var(--tx3)">💵 التكلفة: <span style="color:var(--tx);font-weight:700">$'+totalCost+'</span></span>';
     html += '<span style="font-size:9px;color:var(--tx3)">🎯 الهدف: <span style="color:var(--green);font-weight:700">$'+totalTarget+'</span></span>';
