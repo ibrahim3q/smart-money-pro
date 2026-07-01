@@ -2094,20 +2094,40 @@ async function analyzeOptions(){
         const d=await r.json();
         if(d.contracts?.length>0){
           const stockPrice=LP[t]?.p||D[t].base;
-          // رتب حسب الأقرب لـ ATM
-          const sorted=[...d.contracts].sort((a,b)=>
-            Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice)
-          );
-          // ابحث عن أول عقد بسيولة كافية (سبريد معقول + حجم/OI كافٍ)
-          const liquid=sorted.find(c=>{
-            const mid=c.midpoint>0?c.midpoint:c.lastPrice;
-            if(mid<=0) return false;
-            // لو bid/ask موجودان احسب السبريد، وإلا اقبل العقد بناءً على lastPrice
-            const spreadPct=(c.bid>0&&c.ask>0)?((c.ask-c.bid)/mid*100):0;
+          // للـ Call: اختر أول Strike أعلى من السعر الحالي (OTM خفيف)
+          // للـ Put: اختر أول Strike أقل من السعر الحالي (OTM خفيف)
+          const sorted=[...d.contracts]
+            .filter(c=>(c.midpoint>0||c.lastPrice>0)&&c.strike>0)
+            .sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice));
+
+          // اختيار ATM الصحيح
+          let atmCandidate;
+          if(optType==='call'){
+            // أفضل Call: أقرب Strike أعلى من السعر (OTM خفيف)
+            const otmCalls=sorted.filter(c=>c.strike>=stockPrice);
+            atmCandidate=otmCalls[0]||sorted[0];
+          } else {
+            // أفضل Put: أقرب Strike أقل من السعر (OTM خفيف)
+            const otmPuts=sorted.filter(c=>c.strike<=stockPrice);
+            atmCandidate=otmPuts[0]||sorted[0];
+          }
+
+          // ابحث عن عقد بسيولة كافية بالقرب من ATM
+          const liquid=sorted.filter(c=>{
+            const price=c.midpoint>0?c.midpoint:c.lastPrice;
+            if(price<=0) return false;
+            const spreadPct=(c.bid>0&&c.ask>0)?((c.ask-c.bid)/price*100):0;
             const hasVolume=(c.volume>=10)||(c.openInterest>=50);
-            return spreadPct<=20 && (hasVolume || c.volume>0);
+            return spreadPct<=20&&(hasVolume||c.volume>0);
           });
-          const atm=liquid||sorted[0];
+
+          // اختر أفضل عقد: سيولة جيدة وأقرب لـ ATM
+          const atm=liquid.length>0
+            ?(optType==='call'
+              ?liquid.filter(c=>c.strike>=stockPrice)[0]||liquid[0]
+              :liquid.filter(c=>c.strike<=stockPrice)[0]||liquid[0])
+            :atmCandidate||sorted[0];
+
           const mid=atm.midpoint>0?atm.midpoint:atm.lastPrice||0;
           const spreadPct=(atm.bid>0&&atm.ask>0)?(((atm.ask-atm.bid)/mid)*100):0;
           if(mid>0) optionsData[t]={
