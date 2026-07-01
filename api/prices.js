@@ -121,13 +121,21 @@ export default async function handler(req, res) {
         let r    = await fetch(url);
         let data = await r.json();
 
-        // لو لا توجد عقود للتاريخ المطلوب تحديداً، ابحث عن أقرب تاريخ متاح فعلياً
+        // تجاوز العطل الأمريكية في التواريخ المتاحة
+        const US_HOLIDAYS = ['2026-01-01','2026-01-19','2026-02-16','2026-05-25',
+          '2026-07-03','2026-07-04','2026-09-07','2026-11-26','2026-11-27','2026-12-25'];
+
+        // لو لا توجد عقود للتاريخ المطلوب تحديداً، ابحث عن أقرب تاريخ متاح فعلياً وليس عطلة
         if ((data.results||[]).length === 0 && expiry) {
           const url2 = `${BASE}/v3/snapshot/options/${t}?contract_type=${optionType}&limit=250&apiKey=${API_KEY}`;
           const r2   = await fetch(url2);
           const data2= await r2.json();
           if ((data2.results||[]).length > 0) {
-            const allExpiries = data2.results.map(c=>c.details?.expiration_date).filter(Boolean).sort();
+            // اجمع كل التواريخ المتاحة واستبعد العطل
+            const allExpiries = [...new Set(data2.results
+              .map(c=>c.details?.expiration_date)
+              .filter(d=>d && !US_HOLIDAYS.includes(d))
+            )].sort();
             const nearestExpiry = allExpiries[0] || '';
             data = { results: data2.results.filter(c=>c.details?.expiration_date===nearestExpiry) };
             expiry = nearestExpiry;
