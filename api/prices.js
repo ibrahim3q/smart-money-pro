@@ -1,9 +1,15 @@
-const API_KEY = 'yoTGVzu_bIApT5a0NZyAXN81zi3AUwm2';
+// ⚠️ المفتاح الآن يُقرأ من Environment Variable — لازم تضيف POLYGON_API_KEY في Vercel
+const API_KEY = process.env.POLYGON_API_KEY;
 const BASE    = 'https://api.polygon.io';
+const ALLOWED_ORIGIN = 'https://smart-money-pro-vert.vercel.app';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'GET');
+
+  if (!API_KEY) {
+    return res.status(500).json({ error: 'POLYGON_API_KEY not configured on server' });
+  }
 
   const { type, tickers, ticker, range } = req.query;
 
@@ -261,7 +267,6 @@ export default async function handler(req, res) {
         let minPain = Infinity, maxPainStrike = strikes[0]||0;
         for(const assumedPrice of strikes){
           let totalPain = 0;
-          // Calls: تخسر قيمتها إن أغلق السعر تحت الـ Strike (OTM) - لكن الكاتب يربح؛ pain لحامل call = max(0, strike-price)*oi لو ITM
           calls.forEach(c=>{
             if(assumedPrice > c.strike) totalPain += (assumedPrice - c.strike) * c.oi;
           });
