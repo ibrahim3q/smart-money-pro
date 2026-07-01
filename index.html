@@ -2100,19 +2100,21 @@ async function analyzeOptions(){
           );
           // ابحث عن أول عقد بسيولة كافية (سبريد معقول + حجم/OI كافٍ)
           const liquid=sorted.find(c=>{
-            const mid=c.midpoint>0?c.midpoint:((c.bid+c.ask)/2);
-            if(mid<=0||c.bid<=0||c.ask<=0) return false;
-            const spreadPct=((c.ask-c.bid)/mid)*100;
-            const hasVolume=(c.volume>=50)||(c.openInterest>=100);
-            return spreadPct<=15 && hasVolume;
+            const mid=c.midpoint>0?c.midpoint:c.lastPrice;
+            if(mid<=0) return false;
+            // لو bid/ask موجودان احسب السبريد، وإلا اقبل العقد بناءً على lastPrice
+            const spreadPct=(c.bid>0&&c.ask>0)?((c.ask-c.bid)/mid*100):0;
+            const hasVolume=(c.volume>=10)||(c.openInterest>=50);
+            return spreadPct<=20 && (hasVolume || c.volume>0);
           });
           const atm=liquid||sorted[0];
-          const mid=atm.midpoint>0?atm.midpoint:((atm.bid+atm.ask)/2);
-          const spreadPct=mid>0?(((atm.ask-atm.bid)/mid)*100):999;
+          const mid=atm.midpoint>0?atm.midpoint:atm.lastPrice||0;
+          const spreadPct=(atm.bid>0&&atm.ask>0)?(((atm.ask-atm.bid)/mid)*100):0;
           if(mid>0) optionsData[t]={
             strike:atm.strike,
             entry:+mid.toFixed(2),
             bid:atm.bid,ask:atm.ask,
+            lastPrice:atm.lastPrice||mid,
             spreadPct:+spreadPct.toFixed(1),
             isLiquid:!!liquid,
             iv:+(atm.iv*100).toFixed(1),
@@ -2130,10 +2132,11 @@ async function analyzeOptions(){
     // بناء الـ prompt بالأسعار الحقيقية
     const hasRealData=Object.keys(optionsData).length>0;
     const realPricesText=hasRealData
-      ?Object.entries(optionsData).map(([t,o])=>
-        `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike ATM $${o.strike}, سعر $${o.entry} (bid:${o.bid} ask:${o.ask}, سبريد:${o.spreadPct}%${o.isLiquid?' ✅سيولة جيدة':' ⚠️سيولة ضعيفة'}), IV:${o.iv}%, Delta:${o.delta}, حجم:${o.volume}, OI:${o.openInterest}`
-      ).join('\n')
-      :'لم تتوفر أسعار حقيقية — استخدم تقديرات بناءً على الأسعار الحالية';
+      ?Object.entries(optionsData).map(([t,o])=>{
+        const priceSource=o.bid>0?`bid:${o.bid} ask:${o.ask}`:`lastPrice:${o.lastPrice} (آخر تداول — السوق مغلق)`;
+        return `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike ATM $${o.strike}, سعر العقد $${o.entry} (${priceSource}), IV:${o.iv}%, Delta:${o.delta}, حجم:${o.volume}, OI:${o.openInterest}${o.isLiquid?' ✅سيولة جيدة':' ⚠️سيولة ضعيفة'}`;
+      }).join('\n')
+      :'لم تتوفر أسعار حقيقية';
 
     const mktData=Object.entries(D).slice(0,8).map(([t,s])=>{
       const price=LP[t]?.p||s.base;
