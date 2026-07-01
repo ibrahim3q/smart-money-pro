@@ -2065,12 +2065,13 @@ async function analyzeOptions(){
   const el=document.getElementById('opt-results');
   if(!el) return;
   if(btn){btn.textContent='⏳ جارٍ التحليل...';btn.disabled=true;}
-  el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">🔍</div><div style="font-size:11px">يحلل البوت الذكي البيانات...</div></div>`;
+  el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">📡</div><div style="font-size:11px">جارٍ تحديث الأسعار اللحظية أولاً...</div></div>`;
 
   try {
-    // ── جلب Options Chain الحقيقي من Polygon ──
+    // ── تحديث الأسعار اللحظية أولاً قبل أي تحليل ──
+    await fetchPolygonPrices().catch(()=>{});
+
     const today = new Date();
-    const todayStr = today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const nextFri = new Date(today);
     nextFri.setDate(today.getDate() + ((5-today.getDay()+7)%7 || 7));
     const nextFriStr = nextFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -2086,7 +2087,7 @@ async function analyzeOptions(){
     // جلب أسعار العقود الحقيقية لأفضل 5 أسهم
     const topTickers=['NVDA','META','QQQ','COIN','GOOGL'];
     const optionsData={};
-    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">📡</div><div style="font-size:11px">جارٍ جلب أسعار العقود الحقيقية...</div></div>`;
+    el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">🔍</div><div style="font-size:11px">جارٍ تحليل Options Chain الحقيقي...</div></div>`;
 
     await Promise.allSettled(topTickers.map(async t=>{
       try{
@@ -2094,56 +2095,51 @@ async function analyzeOptions(){
         const d=await r.json();
         if(d.contracts?.length>0){
           const stockPrice=LP[t]?.p||D[t].base;
-          // للـ Call: اختر أول Strike أعلى من السعر الحالي (OTM خفيف)
-          // للـ Put: اختر أول Strike أقل من السعر الحالي (OTM خفيف)
-          const sorted=[...d.contracts]
-            .filter(c=>(c.midpoint>0||c.lastPrice>0)&&c.strike>0)
-            .sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice));
+          // هدف: Strike بعيد 2-4% عن السعر الحالي (OTM مثالي للأسبوعية)
+          const targetOTM_low  = stockPrice * (optType==='call' ? 1.02 : 0.96);
+          const targetOTM_high = stockPrice * (optType==='call' ? 1.05 : 0.93);
 
-          // اختيار ATM الصحيح
-          let atmCandidate;
-          if(optType==='call'){
-            // أفضل Call: أقرب Strike أعلى من السعر (OTM خفيف)
-            const otmCalls=sorted.filter(c=>c.strike>=stockPrice);
-            atmCandidate=otmCalls[0]||sorted[0];
-          } else {
-            // أفضل Put: أقرب Strike أقل من السعر (OTM خفيف)
-            const otmPuts=sorted.filter(c=>c.strike<=stockPrice);
-            atmCandidate=otmPuts[0]||sorted[0];
-          }
+          // فلتر العقود بسيولة جيدة
+          const validContracts=[...d.contracts].filter(c=>(c.midpoint>0||c.lastPrice>0)&&c.strike>0);
 
-          // ابحث عن عقد بسيولة كافية بالقرب من ATM
-          const liquid=sorted.filter(c=>{
-            const price=c.midpoint>0?c.midpoint:c.lastPrice;
-            if(price<=0) return false;
-            const spreadPct=(c.bid>0&&c.ask>0)?((c.ask-c.bid)/price*100):0;
-            const hasVolume=(c.volume>=10)||(c.openInterest>=50);
-            return spreadPct<=20&&(hasVolume||c.volume>0);
+          // اختر العقد الأقرب لنطاق OTM المثالي (2-4%)
+          const otmIdeal = validContracts.filter(c=>
+            optType==='call'
+              ? c.strike>=targetOTM_low && c.strike<=targetOTM_high
+              : c.strike<=targetOTM_low && c.strike>=targetOTM_high
+          ).sort((a,b)=>{
+            const pa=a.midpoint>0?a.midpoint:a.lastPrice;
+            const pb=b.midpoint>0?b.midpoint:b.lastPrice;
+            // الأعلى حجماً وسيولة
+            return (b.volume+b.openInterest)-(a.volume+a.openInterest);
           });
 
-          // اختر أفضل عقد: سيولة جيدة وأقرب لـ ATM
-          const atm=liquid.length>0
-            ?(optType==='call'
-              ?liquid.filter(c=>c.strike>=stockPrice)[0]||liquid[0]
-              :liquid.filter(c=>c.strike<=stockPrice)[0]||liquid[0])
-            :atmCandidate||sorted[0];
+          // إذا لم يوجد عقد في النطاق المثالي، خذ أقرب OTM
+          const otmFallback = validContracts
+            .filter(c=>optType==='call'?c.strike>stockPrice:c.strike<stockPrice)
+            .sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice));
+
+          const atm = otmIdeal[0] || otmFallback[0] || validContracts.sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice))[0];
+          if(!atm) return;
 
           const mid=atm.midpoint>0?atm.midpoint:atm.lastPrice||0;
           const spreadPct=(atm.bid>0&&atm.ask>0)?(((atm.ask-atm.bid)/mid)*100):0;
+          const isLiquid=(atm.volume>=10||atm.openInterest>=50)&&spreadPct<=20;
           if(mid>0) optionsData[t]={
             strike:atm.strike,
             entry:+mid.toFixed(2),
             bid:atm.bid,ask:atm.ask,
             lastPrice:atm.lastPrice||mid,
             spreadPct:+spreadPct.toFixed(1),
-            isLiquid:!!liquid,
+            isLiquid,
             iv:+(atm.iv*100).toFixed(1),
             delta:+atm.delta.toFixed(2),
             theta:+atm.theta.toFixed(3),
             volume:atm.volume,
             openInterest:atm.openInterest,
             expiry:atm.expiry||nextFriISO,
-            stockPrice
+            stockPrice,
+            otmPct:+(Math.abs(atm.strike-stockPrice)/stockPrice*100).toFixed(1)
           };
         }
       }catch(e){}
@@ -2153,8 +2149,8 @@ async function analyzeOptions(){
     const hasRealData=Object.keys(optionsData).length>0;
     const realPricesText=hasRealData
       ?Object.entries(optionsData).map(([t,o])=>{
-        const priceSource=o.bid>0?`bid:${o.bid} ask:${o.ask}`:`lastPrice:${o.lastPrice} (آخر تداول — السوق مغلق)`;
-        return `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike ATM $${o.strike}, سعر العقد $${o.entry} (${priceSource}), IV:${o.iv}%, Delta:${o.delta}, حجم:${o.volume}, OI:${o.openInterest}${o.isLiquid?' ✅سيولة جيدة':' ⚠️سيولة ضعيفة'}`;
+        const priceSource=o.bid>0?`bid:${o.bid} ask:${o.ask}`:`lastPrice:${o.lastPrice}`;
+        return `${t}: سهم $${o.stockPrice.toFixed(2)}, Strike $${o.strike} (OTM ${o.otmPct}%), سعر العقد $${o.entry} (${priceSource}), حجم:${o.volume}, OI:${o.openInterest}${o.isLiquid?' ✅سيولة جيدة':' ⚠️سيولة ضعيفة'}`;
       }).join('\n')
       :'لم تتوفر أسعار حقيقية';
 
