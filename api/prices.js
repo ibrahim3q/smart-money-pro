@@ -135,28 +135,37 @@ export default async function handler(req, res) {
         }
 
         if (data.results?.length > 0) {
-          const contracts = data.results.map(c => ({
-            ticker:       c.details?.ticker         || '',
-            strike:       c.details?.strike_price   || 0,
-            expiry:       c.details?.expiration_date|| '',
-            type:         c.details?.contract_type  || '',
-            // أسعار حقيقية
-            lastPrice:    c.last_quote?.midpoint || c.day?.close || 0,
-            bid:          c.last_quote?.bid      || 0,
-            ask:          c.last_quote?.ask      || 0,
-            midpoint:     c.last_quote?.midpoint || 0,
-            // Greeks
-            delta:        c.greeks?.delta  || 0,
-            gamma:        c.greeks?.gamma  || 0,
-            theta:        c.greeks?.theta  || 0,
-            vega:         c.greeks?.vega   || 0,
-            iv:           c.implied_volatility || 0,
-            // حجم التداول
-            volume:       c.day?.volume    || 0,
-            openInterest: c.open_interest  || 0,
-            // السعر الحالي للسهم
-            underlyingPrice: c.underlying_asset?.price || 0,
-          }));
+          const contracts = data.results.map(c => {
+            const bid      = c.last_quote?.bid   || 0;
+            const ask      = c.last_quote?.ask   || 0;
+            const midpoint = c.last_quote?.midpoint || 0;
+            const lastPr   = c.last_trade?.price || c.day?.close || 0;
+            // السعر الحقيقي: midpoint أولاً (أدق)، ثم lastPrice، ثم يُحسب من bid/ask
+            const realPrice = midpoint > 0 ? midpoint
+                            : (bid > 0 && ask > 0) ? (bid+ask)/2
+                            : lastPr > 0 ? lastPr : 0;
+            return {
+              ticker:       c.details?.ticker          || '',
+              strike:       c.details?.strike_price    || 0,
+              expiry:       c.details?.expiration_date || '',
+              type:         c.details?.contract_type   || '',
+              lastPrice:    lastPr,
+              bid,
+              ask,
+              midpoint:     realPrice,   // نستخدم realPrice كـ midpoint للتوافق
+              // Greeks
+              delta:        c.greeks?.delta  || 0,
+              gamma:        c.greeks?.gamma  || 0,
+              theta:        c.greeks?.theta  || 0,
+              vega:         c.greeks?.vega   || 0,
+              iv:           c.implied_volatility || 0,
+              // حجم التداول
+              volume:       c.day?.volume    || 0,
+              openInterest: c.open_interest  || 0,
+              // السعر الحالي للسهم
+              underlyingPrice: c.underlying_asset?.price || 0,
+            };
+          });
 
           return res.status(200).json({
             type: 'options',
