@@ -215,7 +215,6 @@ body::before {
   transition: background .15s, color .15s;
   color: var(--tx3);
   border: 1px solid transparent;
-  /* 44px minimum touch target */
   min-height: 44px;
 }
 .nav-item .nav-icon { font-size: 20px; line-height: 1; }
@@ -338,7 +337,6 @@ body::before {
   border: 1px solid var(--bd); background: transparent;
   color: var(--tx3); cursor: pointer;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
-  /* 44px touch friendly with combined area */
   min-height: 32px;
   transition: all .12s;
 }
@@ -528,7 +526,6 @@ body::before {
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; font-size: 9px;
   transition: all .12s;
-  /* 44px touch via parent row */
 }
 .ck-box.checked { background: var(--green); border-color: var(--green); color: #000; }
 
@@ -563,7 +560,6 @@ body::before {
   flex: 1; background: transparent; border: none; outline: none;
   color: var(--tx); font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 13px; direction: rtl;
-  /* min-height for touch */
   min-height: 24px;
 }
 .ai-input::placeholder { color: var(--tx3); }
@@ -574,7 +570,7 @@ body::before {
   font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 12px; font-weight: 700;
   cursor: pointer; white-space: nowrap;
-  min-height: 40px; /* touch target */
+  min-height: 40px;
   transition: opacity .12s;
 }
 .ai-send-btn:hover   { opacity: .88; }
@@ -673,7 +669,7 @@ body::before {
   border-radius: 8px; padding: 9px 13px;
   color: var(--tx); font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-size: 12px; direction: rtl; outline: none;
-  min-height: 40px; /* touch target */
+  min-height: 40px;
 }
 .bot-input:focus { border-color: var(--gdim); }
 .bot-send-btn {
@@ -1339,8 +1335,9 @@ const D = {
 };
 
 // ═══════════════════════ POLYGON.IO — أسعار حقيقية ═══════════════════════
-const POLY_KEY = 'yoTGVzu_bIApT5a0NZyAXN81zi3AUwm2';
-const POLY_BASE = 'https://api.polygon.io';
+// ⚠️ ملاحظة أمنية: تم حذف مفتاح Polygon من هنا نهائياً. جميع الطلبات تمر
+// حصراً عبر /api/prices (الباك إند)، حيث المفتاح محفوظ في Environment Variables
+// ولا يظهر أبداً في كود الفرونت إند أو للمتصفح.
 
 // تخزين الأسعار الحقيقية
 const LP = {};
@@ -1792,39 +1789,9 @@ Object.keys(D).forEach(t=>{
   ctabs.appendChild(b);
 });
 
-// ═══ حساب المستويات الديناميكية بالأسعار الحقيقية ═══
-function calcLevels(t) {
-  const s=D[t];
-  if(!s) return {target:0,stop:0,e1Lo:0,e1Hi:0,rr:'—',rrNum:0,wk1:0,mo1:0,mo3:0,bull:0,bear:0,liveP:0};
-  const liveP=(LP[t]?.p>0?LP[t].p:null)||s.base;
-  const pf={
-    NVDA:{tp:.11,sp:.045,e1:.022,e2:.010}, QQQ:{tp:.09,sp:.040,e1:.018,e2:.008},
-    AMD:{tp:.12,sp:.055,e1:.028,e2:.012},  AAPL:{tp:.07,sp:.025,e1:.015,e2:.007},
-    COIN:{tp:.15,sp:.065,e1:.032,e2:.015}, TSLA:{tp:.13,sp:.058,e1:.030,e2:.013},
-    META:{tp:.10,sp:.042,e1:.020,e2:.009}, MSFT:{tp:.08,sp:.035,e1:.017,e2:.008},
-    GOOGL:{tp:.09,sp:.038,e1:.019,e2:.009},SPY:{tp:.06,sp:.028,e1:.014,e2:.006},
-    AMZN:{tp:.10,sp:.044,e1:.022,e2:.010}, SMCI:{tp:.18,sp:.080,e1:.040,e2:.018},
-    PLTR:{tp:.14,sp:.060,e1:.030,e2:.014}, MSTR:{tp:.20,sp:.090,e1:.045,e2:.020},
-    SQQQ:{tp:.15,sp:.055,e1:.025,e2:.012}, IBIT:{tp:.14,sp:.062,e1:.031,e2:.014},
-    ARM:{tp:.13,sp:.055,e1:.027,e2:.012},  MRVL:{tp:.11,sp:.048,e1:.024,e2:.011},
-  }[t]||{tp:.10,sp:.045,e1:.022,e2:.010};
-  const dir=s.beh==='sell'?-1:1;
-  const target=+(liveP*(1+dir*pf.tp)).toFixed(2);
-  const stop=+(liveP*(1-dir*pf.sp)).toFixed(2);
-  const e1Lo=+(liveP*(1-pf.e1-.005)).toFixed(2);
-  const e1Hi=+(liveP*(1-pf.e1+.008)).toFixed(2);
-  const rrNum=+(Math.abs(target-liveP)/Math.abs(liveP-stop)).toFixed(1);
-  return {
-    target,stop,e1Lo,e1Hi,rr:`${rrNum}:1`,rrNum,liveP,
-    wk1:+(liveP*(1+dir*pf.tp*.35)).toFixed(2),
-    mo1:+(liveP*(1+dir*pf.tp*.65)).toFixed(2),
-    mo3:+(liveP*(1+dir*pf.tp)).toFixed(2),
-    bull:+(liveP*(1+dir*pf.tp*1.45)).toFixed(2),
-    bear:+(liveP*(1-pf.sp*1.2)).toFixed(2),
-  };
-}
-
-// ═══ calcLevels — مستويات ديناميكية ═══
+// ═══ calcLevels — مستويات ديناميكية بالأسعار الحقيقية ═══
+// ⚠️ ملاحظة: تعريف واحد فقط (سابقاً كان معرّف مرتين بالغلط — نُسخة مكررة
+// كانت كوداً ميتاً تُلغى بالكامل بسبب إعادة تعريف نفس اسم الدالة).
 function calcLevels(t) {
   const s=D[t];
   if(!s) return {target:0,stop:0,e1Lo:0,e1Hi:0,rr:'—',rrNum:0,wk1:0,mo1:0,mo3:0,bull:0,bear:0,liveP:0};
@@ -2057,6 +2024,10 @@ async function callClaude(prompt, system, maxTokens) {
 }
 
 // ═══════════════════════ OPTIONS ANALYZER ═══════════════════════
+// ⚠️ استراتيجية Strike الحالية: تبحث عن نطاق OTM بمقدار 1-3% (أبعد من ATM
+// بقليل) بدل ATM ±1% الصارم — تعديل مقصود لتحسين نسبة premium/delta على
+// العقود الأسبوعية. إذا رغبت بالعودة لقاعدة ATM ±1% الصارمة، عدّل
+// targetOTM_low/targetOTM_high أدناه.
 async function analyzeOptions(){
   const btn=document.getElementById('opt-btn');
   const capital=parseFloat(document.getElementById('opt-capital')?.value||10000);
@@ -2067,35 +2038,33 @@ async function analyzeOptions(){
   if(btn){btn.textContent='⏳ جارٍ التحليل...';btn.disabled=true;}
   el.innerHTML=`<div style="text-align:center;padding:30px;color:var(--tx3)"><div style="font-size:24px;margin-bottom:8px">📡</div><div style="font-size:11px">جارٍ تحديث الأسعار اللحظية أولاً...</div></div>`;
 
+  // ── حساب تواريخ الانتهاء ديناميكياً (متاح لكل من try و catch) ──
+  const US_HOLIDAYS_2026 = ['2026-01-01','2026-01-19','2026-02-16','2026-05-25',
+    '2026-07-03','2026-07-04','2026-09-07','2026-11-26','2026-11-27','2026-12-25'];
+
+  function nextTradingFriday(fromDate) {
+    const d = new Date(fromDate);
+    d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
+    while(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
+      d.setDate(d.getDate()-1);
+      if(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
+        d.setDate(d.getDate()+8);
+        d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
+      }
+    }
+    return d;
+  }
+
+  const today = new Date();
+  const nextFri = nextTradingFriday(today);
+  const nextFriStr = nextFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const nextFriISO = nextFri.toISOString().slice(0,10);
+  const weekAfter = nextTradingFriday(nextFri);
+  const weekAfterStr = weekAfter.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
   try {
     // ── تحديث الأسعار اللحظية أولاً قبل أي تحليل ──
     await fetchPolygonPrices().catch(()=>{});
-
-    // العطل الأمريكية الرسمية 2026 (YYYY-MM-DD)
-    const US_HOLIDAYS_2026 = ['2026-01-01','2026-01-19','2026-02-16','2026-05-25',
-      '2026-07-03','2026-07-04','2026-09-07','2026-11-26','2026-11-27','2026-12-25'];
-
-    function nextTradingFriday(fromDate) {
-      const d = new Date(fromDate);
-      // الجمعة القادمة
-      d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
-      // تجاوز العطل
-      while(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
-        d.setDate(d.getDate()-1); // جرب الخميس بدلاً من الجمعة
-        if(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
-          d.setDate(d.getDate()+8); // انتقل للجمعة التالية
-          d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
-        }
-      }
-      return d;
-    }
-
-    const today = new Date();
-    const nextFri = nextTradingFriday(today);
-    const nextFriStr = nextFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const nextFriISO = nextFri.toISOString().slice(0,10);
-    const weekAfter = nextTradingFriday(nextFri);
-    const weekAfterStr = weekAfter.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
     const typeText=type==='call'?'Call فقط':type==='put'?'Put فقط':'Call و Put';
     const riskAmt=(capital*risk/100).toFixed(0);
@@ -2125,8 +2094,6 @@ async function analyzeOptions(){
               ? c.strike>=targetOTM_low && c.strike<=targetOTM_high
               : c.strike<=targetOTM_low && c.strike>=targetOTM_high
           ).sort((a,b)=>{
-            const pa=a.midpoint>0?a.midpoint:a.lastPrice;
-            const pb=b.midpoint>0?b.midpoint:b.lastPrice;
             // الأعلى حجماً وسيولة
             return (b.volume+b.openInterest)-(a.volume+a.openInterest);
           });
@@ -2212,12 +2179,12 @@ ${realPricesText}
 
   } catch(e) {
     console.error('Options error:',e);
-    // fallback — عقود نموذجية بناءً على البيانات الحالية
+    // fallback — عقود نموذجية بناءً على البيانات الحالية (تواريخ محسوبة ديناميكياً)
     const fallback=[
-      {ticker:'NVDA',type:'CALL',strike:195,expiry:'Jul 3 2025',entry:2.80,contracts:Math.max(1,Math.floor(capital*risk/100/280)),target:3.36,stopLoss:2.52,reason:'ATM + MACD صاعد + حجم غير طبيعي',confidence:72},
-      {ticker:'META',type:'CALL',strike:565,expiry:'Jul 3 2025',entry:5.20,contracts:Math.max(1,Math.floor(capital*risk/100/520)),target:6.24,stopLoss:4.68,reason:'ATM + تراكم مؤسسي + RSI محايد',confidence:68},
-      {ticker:'QQQ',type:'CALL',strike:716,expiry:'Jul 3 2025',entry:4.50,contracts:Math.max(1,Math.floor(capital*risk/100/450)),target:5.40,stopLoss:4.05,reason:'ATM + دعم EMA20 + سوق صاعد',confidence:65},
-      {ticker:'COIN',type:'CALL',strike:225,expiry:'Jul 3 2025',entry:3.80,contracts:Math.max(1,Math.floor(capital*risk/100/380)),target:4.56,stopLoss:3.42,reason:'ATM + BTC صاعد + زخم قوي',confidence:62},
+      {ticker:'NVDA',type:'CALL',strike:195,expiry:nextFriStr,entry:2.80,contracts:Math.max(1,Math.floor(capital*risk/100/280)),target:3.36,stopLoss:2.52,reason:'ATM + MACD صاعد + حجم غير طبيعي',confidence:72},
+      {ticker:'META',type:'CALL',strike:565,expiry:nextFriStr,entry:5.20,contracts:Math.max(1,Math.floor(capital*risk/100/520)),target:6.24,stopLoss:4.68,reason:'ATM + تراكم مؤسسي + RSI محايد',confidence:68},
+      {ticker:'QQQ',type:'CALL',strike:716,expiry:nextFriStr,entry:4.50,contracts:Math.max(1,Math.floor(capital*risk/100/450)),target:5.40,stopLoss:4.05,reason:'ATM + دعم EMA20 + سوق صاعد',confidence:65},
+      {ticker:'COIN',type:'CALL',strike:225,expiry:nextFriStr,entry:3.80,contracts:Math.max(1,Math.floor(capital*risk/100/380)),target:4.56,stopLoss:3.42,reason:'ATM + BTC صاعد + زخم قوي',confidence:62},
     ];
     renderOptions(fallback,capital,risk);
   }
