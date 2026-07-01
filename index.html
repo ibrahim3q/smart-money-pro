@@ -2071,13 +2071,30 @@ async function analyzeOptions(){
     // ── تحديث الأسعار اللحظية أولاً قبل أي تحليل ──
     await fetchPolygonPrices().catch(()=>{});
 
+    // العطل الأمريكية الرسمية 2026 (YYYY-MM-DD)
+    const US_HOLIDAYS_2026 = ['2026-01-01','2026-01-19','2026-02-16','2026-05-25',
+      '2026-07-03','2026-07-04','2026-09-07','2026-11-26','2026-11-27','2026-12-25'];
+
+    function nextTradingFriday(fromDate) {
+      const d = new Date(fromDate);
+      // الجمعة القادمة
+      d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
+      // تجاوز العطل
+      while(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
+        d.setDate(d.getDate()-1); // جرب الخميس بدلاً من الجمعة
+        if(US_HOLIDAYS_2026.includes(d.toISOString().slice(0,10))) {
+          d.setDate(d.getDate()+8); // انتقل للجمعة التالية
+          d.setDate(d.getDate() + ((5-d.getDay()+7)%7 || 7));
+        }
+      }
+      return d;
+    }
+
     const today = new Date();
-    const nextFri = new Date(today);
-    nextFri.setDate(today.getDate() + ((5-today.getDay()+7)%7 || 7));
+    const nextFri = nextTradingFriday(today);
     const nextFriStr = nextFri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const nextFriISO = nextFri.toISOString().slice(0,10);
-    const weekAfter = new Date(nextFri);
-    weekAfter.setDate(nextFri.getDate()+7);
+    const weekAfter = nextTradingFriday(nextFri);
     const weekAfterStr = weekAfter.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 
     const typeText=type==='call'?'Call فقط':type==='put'?'Put فقط':'Call و Put';
