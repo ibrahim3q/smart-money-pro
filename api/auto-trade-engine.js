@@ -16,6 +16,7 @@ import {
 
 import {
   openOptionPosition,
+  openOptionPositionWithTakeProfit,
   closeOptionPositionMarket,
   placeTakeProfitLimitOrder,
   cancelOrder,
@@ -136,7 +137,7 @@ async function evaluatePosition(pos) {
 
     const currentPrice = quote.price;
 
-    // هل ضرب الهدف؟ (الأمر GTC عند الوسيط من المفروض يتكفل فيه، لكن نتأكد من حالته)
+    // ── الأولوية: هل الأمر GTC عند الوسيط اتنفذ فعلاً؟ (أسرع وأدق مصدر) ──
     if (pos.takeProfitOrderId) {
       const order = await getOrder(pos.takeProfitOrderId).catch(() => null);
       if (order && order.status === 'filled') {
@@ -144,6 +145,21 @@ async function evaluatePosition(pos) {
         await addToDailyPnL(pnl);
         return { closed: true, reason: 'target_filled', exitPrice: parseFloat(order.filled_avg_price), pnl };
       }
+    }
+
+    // ── شبكة أمان مباشرة: نفحص السعر اللحظي مقابل الهدف بغض النظر عن حالة
+    // أمر الوسيط — هذا يحمي الصفقة حتى لو فشل وضع أمر GTC (مثلاً بسبب
+    // race condition بين أمر الدخول وأمر الهدف)، أو لو الأمر لسا ما امتلأ
+    // رغم أن السعر فعلياً وصل الهدف. ──
+    if (currentPrice >= pos.target) {
+      if (pos.takeProfitOrderId) {
+        await cancelOrder(pos.takeProfitOrderId).catch(() => {});
+      }
+      const closeOrder = await closeOptionPositionMarket(pos.occ_symbol, pos.contracts);
+      const exitPrice = parseFloat(closeOrder.filled_avg_price || currentPrice);
+      const pnl = (exitPrice - pos.entry) * pos.contracts * 100;
+      await addToDailyPnL(pnl);
+      return { closed: true, reason: 'target_hit_direct_check', exitPrice, pnl };
     }
 
     // هل ضرب الوقف؟ (-2.5%) — نراقبه إحنا لأن ما فيه ضمان bracket لعقود الخيارات
@@ -286,25 +302,36 @@ async function executeEntry(signal) {
   const riskAmt = CAPITAL * RISK_PCT / 100;
   const contracts = Math.max(1, Math.floor(riskAmt / (signal.entry * 100 * STOP_PCT)));
 
-  const order = await openOptionPosition({
-    ticker: signal.ticker,
-    expiryISO: signal.expiry,
-    type: signal.type,
-    strike: signal.strike,
-    qty: contracts,
-    limitPrice: null, // أمر سوق للدخول (تنفيذ فوري بأفضل سعر متاح)
-  });
-
   const targetPrice = +(signal.entry * (1 + TARGET_PCT)).toFixed(2);
   const stopPrice = +(signal.entry * (1 - STOP_PCT)).toFixed(2);
 
-  // نضع أمر بيع GTC عند الهدف مباشرة (يبقى فعّال بمستوى الوسيط)
+  let order;
   let takeProfitOrderId = null;
   try {
-    const tpOrder = await placeTakeProfitLimitOrder(order.occ_symbol, contracts, targetPrice);
-    takeProfitOrderId = tpOrder.id;
+    // المحاولة الأولى: أمر OTO (دخول + هدف بطلب واحد) — يتجنب مشكلة السباق
+    order = await openOptionPositionWithTakeProfit({
+      ticker: signal.ticker,
+      expiryISO: signal.expiry,
+      type: signal.type,
+      strike: signal.strike,
+      qty: contracts,
+      takeProfitLimitPrice: targetPrice,
+    });
+    // بأمر OTO، الساق الثانية (take_profit) تُنشأ تلقائياً عند الوسيط ونحصل
+    // معرّفها من legs[] إن وُجد
+    takeProfitOrderId = order.legs?.[0]?.id || null;
   } catch (e) {
-    console.error('Failed to place take-profit order:', e.message);
+    console.error('OTO order failed, falling back to plain entry:', e.message);
+    // Fallback: دخول عادي بدون هدف مدمج — evaluatePosition() بيحمي الصفقة
+    // بالفحص المباشر للسعر بأي الأحوال، فما فيه خطر حتى لو فشل هذا كمان
+    order = await openOptionPosition({
+      ticker: signal.ticker,
+      expiryISO: signal.expiry,
+      type: signal.type,
+      strike: signal.strike,
+      qty: contracts,
+      limitPrice: null,
+    });
   }
 
   const position = {
