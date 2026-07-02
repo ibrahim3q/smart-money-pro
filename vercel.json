@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/auto-trade-engine",
+      "schedule": "*/2 13-21 * * 1-5"
+    }
+  ]
+}
