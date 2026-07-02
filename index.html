@@ -2085,11 +2085,24 @@ async function analyzeOptions(){
           const targetOTM_low  = stockPrice * (optType==='call' ? 1.01 : 0.97);
           const targetOTM_high = stockPrice * (optType==='call' ? 1.03 : 0.99);
 
-          // فلتر العقود بسيولة جيدة
-          const validContracts=[...d.contracts].filter(c=>(c.midpoint>0||c.lastPrice>0)&&c.strike>0);
+          // ⚠️ فلتر سيولة حقيقي — يُطبّق قبل اختيار العقد وليس بعده، لمنع تسلل
+          // عقود بسعر شبه صفري (bid=0) كانت تمر سابقاً لأن spreadPct كان يُحسب
+          // كـ0 (أي "سبريد ممتاز") كلما كان bid أو ask غير موجودين — عكس الحقيقة تماماً.
+          const liquidContracts = [...d.contracts].filter(c=>{
+            if(!(c.strike>0)) return false;
+            const price = c.midpoint>0 ? c.midpoint : (c.lastPrice||0);
+            if(price < 0.05) return false;                    // سعر شبه صفري — مرفوض
+            if(!(c.bid>0) || !(c.ask>0)) return false;         // لا يوجد bid/ask حقيقي — مرفوض
+            const spread = ((c.ask - c.bid) / price) * 100;
+            if(spread > 15) return false;                      // سبريد أوسع من الحد المسموح
+            if(!(c.volume>=10 || c.openInterest>=50)) return false; // لا يوجد نشاط تداول فعلي
+            return true;
+          });
 
-          // اختر العقد الأقرب لنطاق OTM المثالي (2-4%)
-          const otmIdeal = validContracts.filter(c=>
+          if(liquidContracts.length===0) return; // ما فيه عقد بسيولة مقبولة لهذا السهم — تجاهله بالكامل
+
+          // اختر العقد الأقرب لنطاق OTM المثالي (1-3%) من بين العقود السائلة فقط
+          const otmIdeal = liquidContracts.filter(c=>
             optType==='call'
               ? c.strike>=targetOTM_low && c.strike<=targetOTM_high
               : c.strike<=targetOTM_low && c.strike>=targetOTM_high
@@ -2098,17 +2111,17 @@ async function analyzeOptions(){
             return (b.volume+b.openInterest)-(a.volume+a.openInterest);
           });
 
-          // إذا لم يوجد عقد في النطاق المثالي، خذ أقرب OTM
-          const otmFallback = validContracts
+          // إذا لم يوجد عقد سائل بالنطاق المثالي، خذ أقرب OTM سائل
+          const otmFallback = liquidContracts
             .filter(c=>optType==='call'?c.strike>stockPrice:c.strike<stockPrice)
             .sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice));
 
-          const atm = otmIdeal[0] || otmFallback[0] || validContracts.sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice))[0];
+          const atm = otmIdeal[0] || otmFallback[0] || liquidContracts.sort((a,b)=>Math.abs(a.strike-stockPrice)-Math.abs(b.strike-stockPrice))[0];
           if(!atm) return;
 
           const mid=atm.midpoint>0?atm.midpoint:atm.lastPrice||0;
-          const spreadPct=(atm.bid>0&&atm.ask>0)?(((atm.ask-atm.bid)/mid)*100):0;
-          const isLiquid=(atm.volume>=10||atm.openInterest>=50)&&spreadPct<=20;
+          const spreadPct=((atm.ask-atm.bid)/mid)*100; // آمن الآن: كل عقود liquidContracts لديها bid/ask حقيقيين
+          const isLiquid=true; // وصل لهذه النقطة فقط لو اجتاز فلتر السيولة أعلاه
           if(mid>0) optionsData[t]={
             strike:atm.strike,
             entry:+mid.toFixed(2),
@@ -2158,9 +2171,9 @@ ${realPricesText}
 1. Expiry: ${nextFriStr} أو ${weekAfterStr} فقط
 2. Strike: ATM تماماً (نفس السعر المذكور أعلاه)
 3. Entry: استخدم السعر الحقيقي المذكور أعلاه إذا متوفر
-4. Target: entry × 1.20 (20% ربح)
-5. StopLoss: entry × 0.90 (10% خسارة)
-6. Contracts: floor($${riskAmt} ÷ (entry × 100))
+4. Target: entry × 1.05 (5% ربح)
+5. StopLoss: entry × 0.975 (2.5% خسارة) — يحافظ على R:R = 2:1
+6. Contracts: floor($${riskAmt} ÷ (entry × 100 × 0.025)) — مبني على الخسارة الفعلية المتوقعة عند الوقف (2.5%)، وليس على افتراض خسارة كامل قيمة العقد
 7. ⚠️ تجنب تماماً أي عقد بسيولة ضعيفة (سبريد > 15% أو حجم/OI منخفض) — لا توصي به حتى لو كانت الإشارة التقنية قوية
 
 أعطني 4 توصيات JSON فقط:
@@ -2181,10 +2194,10 @@ ${realPricesText}
     console.error('Options error:',e);
     // fallback — عقود نموذجية بناءً على البيانات الحالية (تواريخ محسوبة ديناميكياً)
     const fallback=[
-      {ticker:'NVDA',type:'CALL',strike:195,expiry:nextFriStr,entry:2.80,contracts:Math.max(1,Math.floor(capital*risk/100/280)),target:3.36,stopLoss:2.52,reason:'ATM + MACD صاعد + حجم غير طبيعي',confidence:72},
-      {ticker:'META',type:'CALL',strike:565,expiry:nextFriStr,entry:5.20,contracts:Math.max(1,Math.floor(capital*risk/100/520)),target:6.24,stopLoss:4.68,reason:'ATM + تراكم مؤسسي + RSI محايد',confidence:68},
-      {ticker:'QQQ',type:'CALL',strike:716,expiry:nextFriStr,entry:4.50,contracts:Math.max(1,Math.floor(capital*risk/100/450)),target:5.40,stopLoss:4.05,reason:'ATM + دعم EMA20 + سوق صاعد',confidence:65},
-      {ticker:'COIN',type:'CALL',strike:225,expiry:nextFriStr,entry:3.80,contracts:Math.max(1,Math.floor(capital*risk/100/380)),target:4.56,stopLoss:3.42,reason:'ATM + BTC صاعد + زخم قوي',confidence:62},
+      {ticker:'NVDA',type:'CALL',strike:195,expiry:nextFriStr,entry:2.80,contracts:Math.max(1,Math.floor((capital*risk/100)/(2.80*100*0.025))),target:2.94,stopLoss:2.73,reason:'ATM + MACD صاعد + حجم غير طبيعي',confidence:72},
+      {ticker:'META',type:'CALL',strike:565,expiry:nextFriStr,entry:5.20,contracts:Math.max(1,Math.floor((capital*risk/100)/(5.20*100*0.025))),target:5.46,stopLoss:5.07,reason:'ATM + تراكم مؤسسي + RSI محايد',confidence:68},
+      {ticker:'QQQ',type:'CALL',strike:716,expiry:nextFriStr,entry:4.50,contracts:Math.max(1,Math.floor((capital*risk/100)/(4.50*100*0.025))),target:4.73,stopLoss:4.39,reason:'ATM + دعم EMA20 + سوق صاعد',confidence:65},
+      {ticker:'COIN',type:'CALL',strike:225,expiry:nextFriStr,entry:3.80,contracts:Math.max(1,Math.floor((capital*risk/100)/(3.80*100*0.025))),target:3.99,stopLoss:3.71,reason:'ATM + BTC صاعد + زخم قوي',confidence:62},
     ];
     renderOptions(fallback,capital,risk);
   }
@@ -2323,8 +2336,8 @@ async function bsend(msg){
 قواعد التوصيات:
 - Expiry: اليوم أو الجمعة القادمة فقط
 - Strike: ATM تماماً (نفس السعر الحالي)
-- هدف الربح: 20% من سعر الدخول فقط
-- وقف الخسارة: 10% من سعر الدخول فقط
+- هدف الربح: 5% من سعر الدخول فقط
+- وقف الخسارة: 2.5% من سعر الدخول فقط (يحافظ على R:R = 2:1)
 - كن محدداً: اذكر السهم، Strike، Expiry، الدخول، الهدف، الوقف.`;
     const text=await callClaude(q,botSystem,600);
     const ld=document.getElementById('bld');
