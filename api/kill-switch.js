@@ -12,6 +12,18 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // ── تفعيل/تعطيل سريع من المتصفح مباشرة (بدون واجهة) — لحالات الطوارئ ──
+    // مثال: /api/kill-switch?set=true&token=YOUR_CRON_SECRET
+    if (req.method === 'GET' && req.query.set !== undefined) {
+      if (!process.env.CRON_SECRET || req.query.token !== process.env.CRON_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized — invalid token' });
+      }
+      const active = req.query.set === 'true';
+      await setKillSwitch(active);
+      await logDecision({ type: 'kill_switch_toggle', active, via: 'quick_url' });
+      return res.status(200).json({ active, success: true, message: active ? '🛑 تم إيقاف التداول الآلي' : '✅ تم تفعيل التداول الآلي' });
+    }
+
     if (req.method === 'GET') {
       const active = await isKillSwitchActive();
       return res.status(200).json({ active });
