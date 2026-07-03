@@ -17,11 +17,16 @@ import {
   addToDailyPnL,
   isCircuitBreakerTripped,
   tripCircuitBreaker,
+  getDailyTradeCount,
+  incrementDailyTradeCount,
+  acquireExecutionLock,
+  releaseExecutionLock,
   logDecision,
 } from '../lib/redis.js';
 
 import {
   getAccount,
+  getPositions,
   openEquityBracketPosition,
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
@@ -33,6 +38,7 @@ const CAPITAL = parseFloat(process.env.AUTO_TRADE_CAPITAL || '1000');
 const RISK_PCT = parseFloat(process.env.AUTO_TRADE_RISK_PCT || '2');
 const DAILY_LOSS_LIMIT_PCT = parseFloat(process.env.AUTO_TRADE_DAILY_LOSS_PCT || '3');
 const MAX_OPEN_POSITIONS = parseInt(process.env.AUTO_TRADE_MAX_POSITIONS || '2', 10);
+const MAX_DAILY_TRADES = parseInt(process.env.AUTO_TRADE_MAX_DAILY_TRADES || '5', 10);
 const TARGET_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_TARGET_PCT || '1.5') / 100; // افتراضي 1.5%
 const STOP_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_STOP_PCT || '0.75') / 100;    // افتراضي 0.75% (R:R = 2:1)
 
@@ -44,7 +50,7 @@ const HARD_MAX_RISK_PCT = 5;
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
 const POLYGON_BASE = 'https://api.polygon.io';
 
-const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'SPY', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL'];
+const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'SPY', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL', 'GLD', 'IAU'];
 const US_HOLIDAYS_2026 = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-05-25', '2026-07-03', '2026-07-04', '2026-09-07', '2026-11-26', '2026-11-27', '2026-12-25'];
 
 export default async function handler(req, res) {
@@ -54,6 +60,12 @@ export default async function handler(req, res) {
   }
 
   const runLog = { opened: null, closed: [] };
+
+  // ── قفل التنفيذ: لو فيه دورة ثانية شغالة حالياً، ننسحب فوراً بدل ما نتداخل معها ──
+  const lockAcquired = await acquireExecutionLock();
+  if (!lockAcquired) {
+    return res.status(200).json({ status: 'skipped', reason: 'another_cycle_running' });
+  }
 
   try {
     // ── 1. Kill Switch أولاً ──
@@ -68,6 +80,11 @@ export default async function handler(req, res) {
     if (!isMarketOpenNow(nowET)) {
       return res.status(200).json({ status: 'skipped', reason: 'market_closed' });
     }
+
+    // ── 2.5 مزامنة مع Alpaca: الوسيط هو مصدر الحقيقة النهائي للمراكز ──
+    // لو bracket order أغلق صفقة (هدف/وقف) بين دورتين، سجلنا الداخلي ما يدري.
+    // هنا نصحح السجل ونحسب الـPnL الفائت قبل أي قرار جديد.
+    await syncWithBroker();
 
     // ── 3. كنسة نهاية اليوم — إغلاق إجباري لأي مركز مفتوح قبل الإغلاق ──
     // (مضاربة يومية = صفر ترحيل لليوم التالي، بدون أي استثناء)
@@ -114,6 +131,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'max_positions', closed: runLog.closed });
     }
 
+    // ── 5.5 حد عدد الصفقات اليومي (منفصل عن حد الصفقات المفتوحة بنفس الوقت) ──
+    const dailyTradeCount = await getDailyTradeCount();
+    if (dailyTradeCount >= MAX_DAILY_TRADES) {
+      await logDecision({ type: 'skip', reason: 'max_daily_trades_reached', count: dailyTradeCount });
+      return res.status(200).json({ status: 'max_daily_trades', dailyTradeCount, closed: runLog.closed });
+    }
+
     // ── 6. صمّام أمان: تحقق من الحساب الحقيقي عند Alpaca قبل أي حساب حجم صفقة ──
     const sanityCheck = await verifyAccountSanity();
     if (!sanityCheck.ok) {
@@ -130,6 +154,7 @@ export default async function handler(req, res) {
 
     // ── 8. التنفيذ ──
     const opened = await executeEntry(signal);
+    await incrementDailyTradeCount();
     runLog.opened = opened;
     await logDecision({ type: 'open', signal, opened });
 
@@ -139,6 +164,62 @@ export default async function handler(req, res) {
     console.error('auto-trade-engine error:', err);
     await logDecision({ type: 'error', message: err.message }).catch(() => {});
     return res.status(500).json({ error: err.message });
+  } finally {
+    // تحرير القفل دائماً — حتى لو صار خطأ، الدورة القادمة تشتغل طبيعي
+    await releaseExecutionLock().catch(() => {});
+  }
+}
+
+// ═══════════════════════ مزامنة مع الوسيط (مصدر الحقيقة النهائي) ═══════════════════════
+// يقارن سجلنا الداخلي بالمراكز الفعلية عند Alpaca. لو صفقة اختفت من الوسيط
+// (أغلقها bracket order بين دورتين)، نتحقق من أرجل الأمر لمعرفة سعر الخروج
+// الفعلي، نحسب الـPnL الصحيح، ونحدّث قاطع الدائرة — بدل ما تضيع الخسارة/الربح.
+async function syncWithBroker() {
+  try {
+    const localPositions = await getOpenPositions();
+    if (localPositions.length === 0) return;
+
+    const brokerPositions = await getPositions();
+    const brokerSymbols = new Set((brokerPositions || []).map((p) => p.symbol));
+
+    const stillOpen = [];
+    for (const pos of localPositions) {
+      if (brokerSymbols.has(pos.ticker)) {
+        stillOpen.push(pos); // لسا مفتوحة فعلاً عند الوسيط
+        continue;
+      }
+
+      // المركز اختفى من الوسيط — أغلقه bracket order غالباً. نجيب سعر الخروج الفعلي.
+      let exitPrice = null;
+      let closeReason = 'closed_at_broker_unknown_leg';
+
+      const tp = pos.takeProfitOrderId ? await getOrder(pos.takeProfitOrderId).catch(() => null) : null;
+      const sl = pos.stopLossOrderId ? await getOrder(pos.stopLossOrderId).catch(() => null) : null;
+
+      if (tp?.status === 'filled') {
+        exitPrice = parseFloat(tp.filled_avg_price);
+        closeReason = 'target_filled_synced';
+      } else if (sl?.status === 'filled') {
+        exitPrice = parseFloat(sl.filled_avg_price);
+        closeReason = 'stop_loss_filled_synced';
+      }
+
+      // لو ما قدرنا نحدد الرجل المنفذة، نستخدم آخر سعر معروف كتقدير متحفظ
+      if (exitPrice == null) {
+        exitPrice = (await fetchStockPrice(pos.ticker)) || pos.entry;
+      }
+
+      const pnl = (exitPrice - pos.entry) * pos.qty;
+      await addToDailyPnL(pnl);
+      await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
+    }
+
+    if (stillOpen.length !== localPositions.length) {
+      await setOpenPositions(stillOpen);
+    }
+  } catch (err) {
+    // فشل المزامنة لا يوقف الدورة — الفحص المباشر بevaluatePosition يغطي كطبقة ثانية
+    console.error('syncWithBroker error:', err.message);
   }
 }
 
