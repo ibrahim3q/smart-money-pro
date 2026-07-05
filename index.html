@@ -1195,6 +1195,49 @@ body::before {
       </div>
     </div>
 
+    <!-- ══════════ AUTO-TRADING — التداول الآلي ══════════ -->
+    <div class="sec" id="sec-autobot">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">⚙️ التداول الآلي — المراقبة والتحكم</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">Paper Trading عبر Alpaca — أسهم فقط، Bracket Orders</div>
+
+      <!-- حالة النظام -->
+      <div class="g4 mb14">
+        <div class="stat-card"><div class="stat-icon si-g">🤖</div><div><div class="stat-val" id="at-status" style="font-size:13px">—</div><div class="stat-lbl">حالة النظام</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-c">💰</div><div><div class="stat-val" id="at-pnl" style="font-size:15px">—</div><div class="stat-lbl">ربح/خسارة اليوم</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-gr">📊</div><div><div class="stat-val" id="at-open">—</div><div class="stat-lbl">صفقات مفتوحة</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-r">⛔</div><div><div class="stat-val" id="at-breaker" style="font-size:13px">—</div><div class="stat-lbl">قاطع الدائرة</div></div></div>
+      </div>
+
+      <!-- زر الإيقاف الطارئ -->
+      <div class="card mb10" id="at-killcard" style="border-color:rgba(255,69,96,.3)">
+        <div class="card-stripe"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;font-weight:700" id="at-kill-label">🛑 الإيقاف الطارئ</div>
+            <div style="font-size:9px;color:var(--tx3);margin-top:3px">يوقف فتح وإغلاق الصفقات الآلية فوراً — يتطلب رمز الأمان</div>
+          </div>
+          <button onclick="toggleKillSwitch()" id="at-kill-btn" style="padding:11px 22px;border-radius:9px;border:1px solid rgba(255,69,96,.4);background:rgba(255,69,96,.12);color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:44px">⏳ جارٍ التحميل...</button>
+        </div>
+      </div>
+
+      <!-- الصفقات المفتوحة -->
+      <div class="card mb10">
+        <div class="card-stripe"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">📌 الصفقات المفتوحة الآن</div>
+          <button onclick="loadAutoTrade()" style="padding:7px 14px;border-radius:7px;background:var(--gglow);border:1px solid var(--gdim);color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:36px">🔄 تحديث</button>
+        </div>
+        <div id="at-positions"><div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
+      </div>
+
+      <!-- سجل القرارات -->
+      <div class="card">
+        <div class="card-stripe"></div>
+        <div class="card-title">📜 سجل قرارات النظام (آخر 50)</div>
+        <div id="at-decisions" style="max-height:420px;overflow-y:auto"><div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
+      </div>
+    </div>
+
   </div><!-- /app-content -->
 
   <!-- ─── BOTTOM NAV ─── -->
@@ -1205,6 +1248,7 @@ body::before {
     <div class="nav-item" onclick="goTo('signals')"><span class="nav-icon">🎯</span><span class="nav-lbl">إشارات</span></div>
     <div class="nav-item" onclick="goTo('news')"><span class="nav-icon">📰</span><span class="nav-lbl">أخبار</span></div>
     <div class="nav-item" onclick="goTo('options')"><span class="nav-icon">💰</span><span class="nav-lbl">خيارات</span></div>
+    <div class="nav-item" onclick="goTo('autobot')"><span class="nav-icon">⚙️</span><span class="nav-lbl">آلي</span></div>
     <div class="nav-item" onclick="goTo('journal')" style="position:relative"><span class="nav-icon">📒</span><span class="nav-lbl">سجل</span><div id="journal-alert-badge" style="display:none;position:absolute;top:2px;left:8px;width:9px;height:9px;background:var(--red);border-radius:50%;border:1.5px solid var(--bg);animation:blink 1.5s infinite"></div></div>
     <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
     <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
@@ -1920,8 +1964,8 @@ const WD={
 function pickWy(el,k){document.querySelectorAll('.wy-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('wy-t').textContent=WD[k].t;document.getElementById('wy-b').textContent=WD[k].b;}
 
 // ═══ NAVIGATION ═══
-const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',journal:'سجل الصفقات',wyckoff:'منهج Wyckoff',whales:'تدفق الحيتان',ai:'المحلل الذكي'};
-const navOrder=['dashboard','livep','charts','signals','news','options','journal','wyckoff','whales','ai'];
+const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',autobot:'التداول الآلي',journal:'سجل الصفقات',wyckoff:'منهج Wyckoff',whales:'تدفق الحيتان',ai:'المحلل الذكي'};
+const navOrder=['dashboard','livep','charts','signals','news','options','autobot','journal','wyckoff','whales','ai'];
 
 function goTo(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1939,6 +1983,7 @@ function goTo(id){
   if(id==='livep'){ buildLPGrid(); buildPTable(); }
   if(id==='news') setTimeout(()=>loadNews('all'),200);
   if(id==='journal') renderJournal();
+  if(id==='autobot') loadAutoTrade();
 }
 
 // ═══════════════════════ NEWS — الأخبار ═══════════════════════
@@ -2471,6 +2516,158 @@ function clearJournal(){
   setJournal([]);
   renderJournal();
 }
+
+// ═══ AUTO-TRADING DASHBOARD — لوحة التداول الآلي ═══
+let _atKillActive = null;
+let _atToken = null; // يُحفظ بالذاكرة فقط أثناء الجلسة — لا يُخزّن أبداً
+
+async function loadAutoTrade(){
+  try{
+    const res = await fetch('/api/trade-log');
+    const d = await res.json();
+
+    // حالة النظام
+    _atKillActive = !!d.killSwitch;
+    const st = document.getElementById('at-status');
+    if(st){
+      st.textContent = d.killSwitch ? '🛑 متوقف' : '🟢 نشط';
+      st.style.color = d.killSwitch ? 'var(--red)' : 'var(--green)';
+    }
+    const pnlEl = document.getElementById('at-pnl');
+    if(pnlEl){
+      const p = d.dailyPnL||0;
+      pnlEl.textContent = (p>=0?'+':'')+'$'+p.toFixed(0);
+      pnlEl.style.color = p>=0?'var(--green)':'var(--red)';
+    }
+    const opEl = document.getElementById('at-open');
+    if(opEl) opEl.textContent = (d.openPositions||[]).length;
+    const brEl = document.getElementById('at-breaker');
+    if(brEl){
+      brEl.textContent = d.breakerTripped ? '⛔ مفعّل' : '✅ سليم';
+      brEl.style.color = d.breakerTripped ? 'var(--red)' : 'var(--green)';
+    }
+
+    // زر Kill Switch
+    const btn = document.getElementById('at-kill-btn');
+    if(btn){
+      btn.textContent = d.killSwitch ? '▶️ إعادة تفعيل التداول' : '🛑 إيقاف طارئ الآن';
+      btn.style.background = d.killSwitch ? 'rgba(0,230,118,.12)' : 'rgba(255,69,96,.12)';
+      btn.style.borderColor = d.killSwitch ? 'rgba(0,230,118,.4)' : 'rgba(255,69,96,.4)';
+      btn.style.color = d.killSwitch ? 'var(--green)' : 'var(--red)';
+    }
+
+    // الصفقات المفتوحة
+    const posEl = document.getElementById('at-positions');
+    if(posEl){
+      const positions = d.openPositions||[];
+      posEl.innerHTML = positions.length===0
+        ? '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">لا توجد صفقات مفتوحة حالياً</div>'
+        : positions.map(p=>`
+          <div style="background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--cyan)">${p.ticker} × ${p.qty} سهم</span>
+              <span style="font-size:9px;color:var(--tx3)">${new Date(p.openedAt).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:9px">
+              <div style="background:var(--s3);border-radius:6px;padding:7px;text-align:center">دخول<br><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--gold)">$${p.entry}</span></div>
+              <div style="background:rgba(0,230,118,.06);border-radius:6px;padding:7px;text-align:center">هدف<br><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green)">$${p.target}</span></div>
+              <div style="background:rgba(255,69,96,.06);border-radius:6px;padding:7px;text-align:center">وقف<br><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red)">$${p.stopLoss}</span></div>
+            </div>
+            <div style="font-size:8px;color:var(--tx3);margin-top:7px">
+              ${p.takeProfitOrderId&&p.stopLossOrderId?'🛡️ محمي بالكامل عند الوسيط (Bracket)':'⚠️ حماية جزئية — يعتمد على المراقبة الدورية'}
+              — ${p.reason||''}
+            </div>
+          </div>`).join('');
+    }
+
+    // سجل القرارات
+    const decEl = document.getElementById('at-decisions');
+    if(decEl){
+      const decisions = d.decisions||[];
+      const typeInfo = {
+        open:  {icon:'🟢', label:'فتح صفقة',    color:'var(--green)'},
+        close: {icon:'🔵', label:'إغلاق صفقة',  color:'var(--cyan)'},
+        skip:  {icon:'⏭️', label:'تخطّي',       color:'var(--tx3)'},
+        no_signal: {icon:'🔍', label:'لا إشارة', color:'var(--tx3)'},
+        error: {icon:'⚠️', label:'خطأ',         color:'var(--red)'},
+        kill_switch_toggle: {icon:'🎛️', label:'تبديل الإيقاف', color:'var(--orange)'},
+      };
+      const reasonAr = {
+        kill_switch_active:'الإيقاف الطارئ مفعّل', market_closed:'السوق مغلق',
+        daily_loss_circuit_breaker:'قاطع الدائرة اليومي', max_positions_reached:'وصل حد الصفقات المتزامنة',
+        max_daily_trades_reached:'وصل حد الصفقات اليومي', outside_entry_window:'خارج نافذة الدخول (أول 15 دقيقة)',
+        another_cycle_running:'دورة أخرى شغالة', account_sanity_check_failed:'فشل فحص الحساب',
+        target_filled:'تحقق الهدف ✅', stop_loss_filled:'ضرب الوقف', stop_loss_triggered:'ضرب الوقف',
+        target_hit_direct_check:'تحقق الهدف (فحص مباشر) ✅', stop_hit_direct_check:'ضرب الوقف (فحص مباشر)',
+        end_of_day_forced_close:'إغلاق نهاية اليوم الإجباري', target_filled_synced:'تحقق الهدف (مزامنة) ✅',
+        stop_loss_filled_synced:'ضرب الوقف (مزامنة)',
+      };
+      decEl.innerHTML = decisions.length===0
+        ? '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">لا توجد قرارات مسجلة بعد</div>'
+        : decisions.map(dec=>{
+            const info = typeInfo[dec.type]||{icon:'•',label:dec.type,color:'var(--tx2)'};
+            const time = new Date(dec.timestamp).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
+            let detail = '';
+            if(dec.type==='open' && dec.opened) detail = `${dec.opened.ticker} × ${dec.opened.qty} @ $${dec.opened.entry}`;
+            else if(dec.type==='close' && dec.position) detail = `${dec.position.ticker} — ${reasonAr[dec.result?.reason]||dec.result?.reason||''} — ${dec.result?.pnl>=0?'+':''}$${(dec.result?.pnl||0).toFixed(0)}`;
+            else if(dec.reason) detail = reasonAr[dec.reason]||dec.reason;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(28,45,64,.35)">
+              <span style="font-size:12px">${info.icon}</span>
+              <div style="flex:1;min-width:0">
+                <span style="font-size:10px;font-weight:700;color:${info.color}">${info.label}</span>
+                <span style="font-size:9px;color:var(--tx2);margin-right:6px">${detail}</span>
+              </div>
+              <span style="font-size:8px;color:var(--tx3);white-space:nowrap">${time}</span>
+            </div>`;
+          }).join('');
+    }
+  }catch(e){
+    const posEl=document.getElementById('at-positions');
+    if(posEl) posEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--red);font-size:10px">⚠️ تعذر الاتصال بالنظام — '+e.message+'</div>';
+  }
+}
+
+async function toggleKillSwitch(){
+  const btn = document.getElementById('at-kill-btn');
+  const targetState = !_atKillActive; // نبدّل الحالة الحالية
+  const actionLabel = targetState ? 'إيقاف التداول الآلي' : 'إعادة تفعيل التداول الآلي';
+
+  if(!confirm(`تأكيد: ${actionLabel}؟`)) return;
+
+  // نطلب رمز الأمان (مرة واحدة بالجلسة، يُحفظ بالذاكرة فقط)
+  if(!_atToken){
+    _atToken = prompt('أدخل رمز الأمان (CRON_SECRET):');
+    if(!_atToken) return;
+  }
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جارٍ التنفيذ...'; }
+  try{
+    const res = await fetch('/api/kill-switch', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ active: targetState, token: _atToken })
+    });
+    const d = await res.json();
+    if(res.status===401){
+      _atToken = null; // رمز خاطئ — نمسحه ليُطلب من جديد
+      alert('❌ رمز الأمان غير صحيح');
+    } else if(d.success){
+      alert(targetState ? '🛑 تم إيقاف التداول الآلي' : '✅ تم إعادة تفعيل التداول الآلي');
+    } else {
+      alert('⚠️ '+(d.error||'حدث خطأ'));
+    }
+  }catch(e){
+    alert('⚠️ تعذر الاتصال: '+e.message);
+  }
+  if(btn) btn.disabled = false;
+  loadAutoTrade();
+}
+
+// تحديث تلقائي كل 30 ثانية لو قسم التداول الآلي مفتوح
+setInterval(()=>{
+  const sec = document.getElementById('sec-autobot');
+  if(sec?.classList.contains('active')) loadAutoTrade();
+}, 30000);
 
 // ═══ CLOCK ═══
 function tick(){
