@@ -33,6 +33,8 @@ import {
   getOrder,
 } from '../lib/alpaca.js';
 
+import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker } from '../lib/notify.js';
+
 // ── إعدادات المخاطرة (Environment Variables، بقيم افتراضية آمنة لمضاربة يومية) ──
 const CAPITAL = parseFloat(process.env.AUTO_TRADE_CAPITAL || '1000');
 const RISK_PCT = parseFloat(process.env.AUTO_TRADE_RISK_PCT || '2');
@@ -102,6 +104,7 @@ export default async function handler(req, res) {
       if (result.closed) {
         runLog.closed.push(result);
         await logDecision({ type: 'close', position: pos, result });
+        await notifyTradeClosed(pos, result).catch(() => {});
       } else {
         stillOpen.push(pos);
       }
@@ -117,8 +120,9 @@ export default async function handler(req, res) {
     // ── 4. قاطع الدائرة اليومي ──
     const dailyPnL = await getDailyPnL();
     const dailyLossLimit = -(CAPITAL * DAILY_LOSS_LIMIT_PCT / 100);
-    if (dailyPnL <= dailyLossLimit) {
+    if (dailyPnL <= dailyLossLimit && !(await isCircuitBreakerTripped())) {
       await tripCircuitBreaker();
+      await notifyCircuitBreaker(dailyPnL).catch(() => {});
     }
     if (await isCircuitBreakerTripped()) {
       await logDecision({ type: 'skip', reason: 'daily_loss_circuit_breaker', dailyPnL });
@@ -136,6 +140,12 @@ export default async function handler(req, res) {
     if (dailyTradeCount >= MAX_DAILY_TRADES) {
       await logDecision({ type: 'skip', reason: 'max_daily_trades_reached', count: dailyTradeCount });
       return res.status(200).json({ status: 'max_daily_trades', dailyTradeCount, closed: runLog.closed });
+    }
+
+    // ── 5.7 نافذة الدخول: لا صفقات جديدة بأول 15 دقيقة من الجلسة ──
+    if (!isEntryWindowOpen(nowET)) {
+      await logDecision({ type: 'skip', reason: 'outside_entry_window' });
+      return res.status(200).json({ status: 'outside_entry_window', closed: runLog.closed });
     }
 
     // ── 6. صمّام أمان: تحقق من الحساب الحقيقي عند Alpaca قبل أي حساب حجم صفقة ──
@@ -157,6 +167,7 @@ export default async function handler(req, res) {
     await incrementDailyTradeCount();
     runLog.opened = opened;
     await logDecision({ type: 'open', signal, opened });
+    await notifyTradeOpened(opened).catch(() => {});
 
     return res.status(200).json({ status: 'ok', opened, closed: runLog.closed });
 
@@ -234,6 +245,15 @@ function isMarketOpenNow(ny) {
   if (US_HOLIDAYS_2026.includes(dateStr)) return false;
   const mins = ny.getHours() * 60 + ny.getMinutes();
   return mins >= 570 && mins < 960; // 9:30 - 16:00 ET فقط
+}
+
+// ── نافذة الدخول: من 9:45 فقط (مو 9:30) ──
+// أول 15 دقيقة من الجلسة هي الأكثر تقلباً وتضليلاً: فجوات افتتاح، أوامر
+// متراكمة من الليل، وحركات وهمية تنعكس سريعاً. المراقبة والإغلاق يبقيان
+// نشطين من 9:30، لكن فتح صفقات جديدة يبدأ بعد استقرار الافتتاح.
+function isEntryWindowOpen(ny) {
+  const mins = ny.getHours() * 60 + ny.getMinutes();
+  return mins >= 585 && mins < 955; // 9:45 حتى 15:55 ET
 }
 
 // ═══════════════════════ صمّام أمان: تحقق من الحساب الحقيقي ═══════════════════════
