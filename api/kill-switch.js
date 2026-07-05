@@ -30,7 +30,13 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { active } = req.body || {};
+      const { active, token } = req.body || {};
+      // ⚠️ التوثيق إلزامي هنا أيضاً — CORS يحمي من المتصفحات فقط، وأي طلب
+      // مباشر (curl مثلاً) يتجاوزه بالكامل. بدون هذا الفحص أي شخص يعرف
+      // الرابط يقدر يعيد تفعيل التداول بدون علمك.
+      if (!process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized — invalid token' });
+      }
       if (typeof active !== 'boolean') {
         return res.status(400).json({ error: 'active (boolean) is required' });
       }
