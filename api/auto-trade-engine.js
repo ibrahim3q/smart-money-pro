@@ -19,6 +19,8 @@ import {
   tripCircuitBreaker,
   getDailyTradeCount,
   incrementDailyTradeCount,
+  setCooldown,
+  isCoolingDown,
   acquireExecutionLock,
   releaseExecutionLock,
   logDecision,
@@ -105,6 +107,7 @@ export default async function handler(req, res) {
         runLog.closed.push(result);
         await logDecision({ type: 'close', position: pos, result });
         await notifyTradeClosed(pos, result).catch(() => {});
+        await setCooldown(pos.ticker).catch(() => {});
       } else {
         stillOpen.push(pos);
       }
@@ -163,7 +166,17 @@ export default async function handler(req, res) {
     }
 
     // ── 8. التنفيذ ──
-    const opened = await executeEntry(signal);
+    let opened;
+    try {
+      opened = await executeEntry(signal);
+    } catch (execErr) {
+      // فشل التنفيذ (زي: السعر تحرك بين القرار والإرسال) — نسجّل، نعطي
+      // السهم تهدئة قصيرة (دقيقتين، أقصر من تهدئة الإغلاق العادي)، ونكمل
+      // بهدوء بدل ما نفشل الدورة كاملة بخطأ 500
+      await setCooldown(signal.ticker, 120).catch(() => {});
+      await logDecision({ type: 'error', message: execErr.message, ticker: signal.ticker }).catch(() => {});
+      return res.status(200).json({ status: 'entry_failed', ticker: signal.ticker, error: execErr.message, closed: runLog.closed });
+    }
     await incrementDailyTradeCount();
     runLog.opened = opened;
     await logDecision({ type: 'open', signal, opened });
@@ -222,6 +235,7 @@ async function syncWithBroker() {
 
       const pnl = (exitPrice - pos.entry) * pos.qty;
       await addToDailyPnL(pnl);
+      await setCooldown(pos.ticker).catch(() => {});
       await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
     }
 
@@ -355,7 +369,11 @@ async function fetchStockPrice(ticker) {
 // ═══════════════════════ البحث عن أفضل إشارة (نفس منطق RSI/MACD، أسهم مباشرة) ═══════════════════════
 async function findBestSignal(openPositions) {
   const openTickers = new Set(openPositions.map((p) => p.ticker));
-  const candidates = WATCHLIST.filter((t) => !openTickers.has(t));
+  const candidatesRaw = WATCHLIST.filter((t) => !openTickers.has(t));
+
+  // استبعد أي سهم بفترة تهدئة (أُغلق أو فشلت محاولة فتحه مؤخراً)
+  const cooldownChecks = await Promise.all(candidatesRaw.map((t) => isCoolingDown(t)));
+  const candidates = candidatesRaw.filter((_, i) => !cooldownChecks[i]);
 
   const scored = [];
   await Promise.allSettled(candidates.map(async (t) => {
