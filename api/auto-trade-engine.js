@@ -29,7 +29,9 @@ import {
 import {
   getAccount,
   getPositions,
-  openEquityBracketPosition,
+  openEquityMarketOrder,
+  pollOrderFill,
+  placeOCOExit,
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
   getOrder,
@@ -407,31 +409,46 @@ async function findBestSignal(openPositions) {
 
 // ═══════════════════════ تنفيذ الدخول (Bracket Order — حماية حقيقية عند الوسيط) ═══════════════════════
 async function executeEntry(signal) {
-  // ── حساب حجم الصفقة، مع تطبيق السقف الصارم كطبقة حماية إضافية ──
+  // ── حساب حجم الصفقة (تقديري، مبني على سعر الإشارة — الكمية نفسها لا
+  // تتأثر بفروقات الأسعار الصغيرة بقدر ما يتأثر بها الهدف/الوقف) ──
   const effectiveRiskPct = Math.min(RISK_PCT, HARD_MAX_RISK_PCT);
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
-
-  const targetPrice = +(signal.entry * (1 + TARGET_PCT)).toFixed(2);
-  const stopPrice = +(signal.entry * (1 - STOP_PCT)).toFixed(2);
-
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
 
-  const order = await openEquityBracketPosition({
-    symbol: signal.ticker,
-    qty: shares,
-    takeProfitPrice: targetPrice,
-    stopLossPrice: stopPrice,
-  });
+  // ── 1) الدخول: أمر سوق بسيط بدون أرجل حماية مربوطة بعد ──
+  const entryOrder = await openEquityMarketOrder({ symbol: signal.ticker, qty: shares });
 
-  // أرجل الـ bracket تظهر بـ legs[] بعد إنشاء الأمر
-  const legs = order.legs || [];
-  const takeProfitOrderId = legs.find((l) => l.type === 'limit')?.id || null;
-  const stopLossOrderId = legs.find((l) => l.type === 'stop')?.id || null;
+  // ── 2) ننتظر تأكيد التنفيذ الفعلي ونجيب السعر الحقيقي ──
+  const filledOrder = await pollOrderFill(entryOrder.id);
+  const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
+
+  // ── 3) نحسب الهدف والوقف من السعر الحقيقي (مو سعر الإشارة القديم) ──
+  const targetPrice = +(realEntryPrice * (1 + TARGET_PCT)).toFixed(2);
+  const stopPrice = +(realEntryPrice * (1 - STOP_PCT)).toFixed(2);
+
+  // ── 4) نربط الحماية الآن بالسعر الصحيح عبر أمر OCO ──
+  let takeProfitOrderId = null;
+  let stopLossOrderId = null;
+  try {
+    const ocoOrder = await placeOCOExit({
+      symbol: signal.ticker,
+      qty: shares,
+      takeProfitPrice: targetPrice,
+      stopLossPrice: stopPrice,
+    });
+    const legs = ocoOrder.legs || [ocoOrder];
+    takeProfitOrderId = legs.find((l) => l.type === 'limit')?.id || null;
+    stopLossOrderId = legs.find((l) => l.type === 'stop')?.id || null;
+  } catch (e) {
+    console.error('OCO exit placement failed:', e.message);
+    // الصفقة مفتوحة بدون حماية عند الوسيط — evaluatePosition() بالفحص
+    // المباشر للسعر يبقى شبكة الأمان الأخيرة حتى لو فشل هذا الأمر
+  }
 
   const position = {
-    id: order.id,
+    id: entryOrder.id,
     ticker: signal.ticker,
-    entry: signal.entry,
+    entry: realEntryPrice, // السعر الحقيقي، مو سعر الإشارة
     qty: shares,
     target: targetPrice,
     stopLoss: stopPrice,
@@ -440,6 +457,7 @@ async function executeEntry(signal) {
     openedAt: new Date().toISOString(),
     reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}`,
     riskAmt,
+    signalPrice: signal.entry, // نحتفظ بسعر الإشارة الأصلي للمقارنة والتحليل لاحقاً
   };
 
   const openPositions = await getOpenPositions();
