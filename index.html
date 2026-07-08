@@ -2591,6 +2591,7 @@ async function loadAutoTrade(){
         no_signal: {icon:'🔍', label:'لا إشارة', color:'var(--tx3)'},
         error: {icon:'⚠️', label:'خطأ',         color:'var(--red)'},
         kill_switch_toggle: {icon:'🎛️', label:'تبديل الإيقاف', color:'var(--orange)'},
+        skip_summary: {icon:'⏭️', label:'تخطّي متكرر', color:'var(--tx3)'},
       };
       const reasonAr = {
         kill_switch_active:'الإيقاف الطارئ مفعّل', market_closed:'السوق مغلق',
@@ -2610,6 +2611,11 @@ async function loadAutoTrade(){
             let detail = '';
             if(dec.type==='open' && dec.opened) detail = `${dec.opened.ticker} × ${dec.opened.qty} @ $${dec.opened.entry}`;
             else if(dec.type==='close' && dec.position) detail = `${dec.position.ticker} — ${reasonAr[dec.result?.reason]||dec.result?.reason||''} — ${dec.result?.pnl>=0?'+':''}$${(dec.result?.pnl||0).toFixed(0)}`;
+            else if(dec.type==='skip_summary'){
+              const fromT = new Date(dec.from).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
+              const toT = new Date(dec.to).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
+              detail = `${reasonAr[dec.reason]||dec.reason} × ${dec.count} مرة (${fromT} → ${toT})`;
+            }
             else if(dec.reason) detail = reasonAr[dec.reason]||dec.reason;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(28,45,64,.35)">
               <span style="font-size:12px">${info.icon}</span>
