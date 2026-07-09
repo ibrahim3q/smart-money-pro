@@ -399,13 +399,49 @@ async function findBestSignal(openPositions) {
 
   if (scored.length === 0) return null;
   scored.sort((a, b) => b.score - a.score);
-  const best = scored[0];
 
-  const stockPrice = await fetchStockPrice(best.ticker);
-  if (!stockPrice) return null;
+  // ── فلتر الاتجاه العام: نتحقق من كل مرشّح بترتيب القوة، ونقبل أول واحد
+  // فعلاً فوق EMA50 (اتجاه صاعد مؤكد) — نتخطى أي مرشّح تحت اتجاهه العام
+  // حتى لو زخمه اللحظي (MACD) يبدو قوياً. هذا يمنع الشراء ضد التيار. ──
+  for (const candidate of scored) {
+    const stockPrice = await fetchStockPrice(candidate.ticker);
+    if (!stockPrice) continue;
 
-  return { ticker: best.ticker, entry: stockPrice, rsi: best.rsi, macdHist: best.macdHist, score: best.score };
+    const ema50 = await fetchEMA50(candidate.ticker);
+    if (ema50 != null && stockPrice < ema50) {
+      continue; // السهم تحت اتجاهه العام — تخطَّه جرّب التالي
+    }
+
+    return {
+      ticker: candidate.ticker,
+      entry: stockPrice,
+      rsi: candidate.rsi,
+      macdHist: candidate.macdHist,
+      score: candidate.score,
+      ema50,
+    };
+  }
+
+  return null; // ولا مرشّح واحد اجتاز فلتر الاتجاه العام
 }
+
+// ═══════════════════════ EMA50 يومي — لتأكيد الاتجاه العام ═══════════════════════
+async function fetchEMA50(ticker) {
+  try {
+    const url = `${POLYGON_BASE}/v1/indicators/ema/${ticker}?timespan=day&adjusted=true&window=50&series_type=close&limit=1&apiKey=${POLYGON_KEY}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    return d?.results?.values?.[0]?.value ?? null;
+  } catch (e) {
+    return null; // فشل الجلب — لا نمنع الصفقة بسبب هذا وحده، نتركه يمر (fail-open على هذا الفلتر تحديداً)
+  }
+}
+
+// ⚠️ أقصى فجوة مسموحة بين سعر الإشارة ولحظة التنفيذ (بالنسبة المئوية).
+// اكتُشف هذا الفلتر بعد تحليل 3 أيام بيانات: كل صفقة كانت فجوتها >1% (يعني
+// السعر قفز صعوداً كثير بين الإشارة والتنفيذ) خسرت خلال دقائق — نمط "شراء
+// قمة مؤقتة" كلاسيكي. القيمة الافتراضية محافظة بناءً على هذا الدليل.
+const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
 
 // ═══════════════════════ تنفيذ الدخول (Bracket Order — حماية حقيقية عند الوسيط) ═══════════════════════
 async function executeEntry(signal) {
@@ -414,6 +450,17 @@ async function executeEntry(signal) {
   const effectiveRiskPct = Math.min(RISK_PCT, HARD_MAX_RISK_PCT);
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
+
+  // ── فحص فجوة التنفيذ: سعر طازج مباشرة قبل إرسال الأمر — لو قفز صعوداً
+  // أكثر من الحد المسموح منذ لحظة اكتشاف الإشارة، نلغي الصفقة بالكامل بدل
+  // ما نشتري بقمة مؤقتة محتملة ──
+  const freshPrice = await fetchStockPrice(signal.ticker);
+  if (freshPrice) {
+    const gapPct = ((freshPrice - signal.entry) / signal.entry) * 100;
+    if (gapPct > MAX_ENTRY_GAP_PCT) {
+      throw new Error(`price_gap_too_large: signal=${signal.entry} fresh=${freshPrice} gap=${gapPct.toFixed(2)}%`);
+    }
+  }
 
   // ── 1) الدخول: أمر سوق بسيط بدون أرجل حماية مربوطة بعد ──
   const entryOrder = await openEquityMarketOrder({ symbol: signal.ticker, qty: shares });
@@ -455,7 +502,7 @@ async function executeEntry(signal) {
     takeProfitOrderId,
     stopLossOrderId,
     openedAt: new Date().toISOString(),
-    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}`,
+    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}`,
     riskAmt,
     signalPrice: signal.entry, // نحتفظ بسعر الإشارة الأصلي للمقارنة والتحليل لاحقاً
   };
