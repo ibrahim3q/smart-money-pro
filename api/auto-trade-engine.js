@@ -56,7 +56,7 @@ const HARD_MAX_RISK_PCT = 5;
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
 const POLYGON_BASE = 'https://api.polygon.io';
 
-const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'SPY', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL', 'GLD', 'IAU'];
+const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL'];
 const US_HOLIDAYS_2026 = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-05-25', '2026-07-03', '2026-07-04', '2026-09-07', '2026-11-26', '2026-11-27', '2026-12-25'];
 
 export default async function handler(req, res) {
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
         await notifyTradeClosed(pos, result).catch(() => {});
         await setCooldown(pos.ticker).catch(() => {});
       } else {
-        stillOpen.push(pos);
+        stillOpen.push(result.updatedPos || pos);
       }
     }
     await setOpenPositions(stillOpen);
@@ -295,6 +295,13 @@ async function verifyAccountSanity() {
 }
 
 // ═══════════════════════ مراقبة/إغلاق صفقة مفتوحة (أثناء اليوم) ═══════════════════════
+// ⚠️ إعدادات قفل الربح المتحرك — يُفعّل بعد ما يصل السعر 70% من الطريق
+// للهدف، ويغلق فوراً لو ارتد 25% من الربح المتحقق من أعلى نقطة وصلها.
+// يحل مشكلة "الاقتراب من الهدف بدون لمسه ثم الارتداد الكامل" المكتشفة
+// بالمراقبة اليدوية — قفل ربح جزئي مؤكد أفضل من المخاطرة بضياعه بالكامل.
+const TRAILING_LOCK_TRIGGER_PROGRESS = 0.80;
+const TRAILING_LOCK_PULLBACK_PCT = 0.25;
+
 async function evaluatePosition(pos) {
   try {
     // نتحقق أولاً هل أحد أرجل الـ Bracket اتنفذ فعلاً عند الوسيط (المصدر الأدق والأسرع)
@@ -317,7 +324,7 @@ async function evaluatePosition(pos) {
 
     // شبكة أمان مباشرة إضافية: نفحص السعر اللحظي الحقيقي من Polygon كتأكيد ثانٍ
     const price = await fetchStockPrice(pos.ticker);
-    if (price == null) return { closed: false, reason: 'no_quote' };
+    if (price == null) return { closed: false, reason: 'no_quote', updatedPos: pos };
 
     if (price >= pos.target || price <= pos.stopLoss) {
       // الحماية عند الوسيط لازم تكون تكفلت فيها أصلاً (bracket)، لكن لو لأي
@@ -334,9 +341,30 @@ async function evaluatePosition(pos) {
       };
     }
 
-    return { closed: false, currentPrice: price };
+    // ── قفل الربح المتحرك ──
+    const distanceToTarget = pos.target - pos.entry;
+    const peakPrice = Math.max(pos.peakPrice || pos.entry, price);
+    const peakProgress = distanceToTarget > 0 ? (peakPrice - pos.entry) / distanceToTarget : 0;
+
+    if (peakProgress >= TRAILING_LOCK_TRIGGER_PROGRESS) {
+      const gainFromEntryToPeak = peakPrice - pos.entry;
+      const pullbackFromPeak = peakPrice - price;
+      const pullbackRatio = gainFromEntryToPeak > 0 ? pullbackFromPeak / gainFromEntryToPeak : 0;
+
+      if (pullbackRatio >= TRAILING_LOCK_PULLBACK_PCT) {
+        await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
+        const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
+        const exitPrice = parseFloat(closeOrder.filled_avg_price || price);
+        const pnl = (exitPrice - pos.entry) * pos.qty;
+        await addToDailyPnL(pnl);
+        return { closed: true, reason: 'profit_lock_trailing', exitPrice, pnl };
+      }
+    }
+
+    // لسا مفتوحة — نحفظ القمة المحدّثة لتُستخدم بالدورة القادمة
+    return { closed: false, currentPrice: price, updatedPos: { ...pos, peakPrice } };
   } catch (err) {
-    return { closed: false, reason: 'evaluation_error', error: err.message };
+    return { closed: false, reason: 'evaluation_error', error: err.message, updatedPos: pos };
   }
 }
 
@@ -496,6 +524,7 @@ async function executeEntry(signal) {
     id: entryOrder.id,
     ticker: signal.ticker,
     entry: realEntryPrice, // السعر الحقيقي، مو سعر الإشارة
+    peakPrice: realEntryPrice, // لتتبّع قفل الربح المتحرك لاحقاً
     qty: shares,
     target: targetPrice,
     stopLoss: stopPrice,
