@@ -465,10 +465,11 @@ async function fetchEMA50(ticker) {
   }
 }
 
-// ⚠️ أقصى فجوة مسموحة بين سعر الإشارة ولحظة التنفيذ (بالنسبة المئوية).
-// اكتُشف هذا الفلتر بعد تحليل 3 أيام بيانات: كل صفقة كانت فجوتها >1% (يعني
-// السعر قفز صعوداً كثير بين الإشارة والتنفيذ) خسرت خلال دقائق — نمط "شراء
-// قمة مؤقتة" كلاسيكي. القيمة الافتراضية محافظة بناءً على هذا الدليل.
+// ⚠️ أقصى فجوة مسموحة (بالاتجاهين) بين سعر الإشارة ولحظة التنفيذ.
+// اكتُشف هذا الفلتر بعد تحليل عدة أيام بيانات: فجوة صاعدة كبيرة (>1%)
+// = مطاردة قمة مؤقتة (خسرت خلال دقائق كل مرة). فجوة هابطة كبيرة (مثل
+// AMZN بـ-1.53%) = الزخم الصاعد الذي بُنيت عليه الإشارة انتهى أو انعكس
+// فعلاً قبل الدخول. كلا النمطين يُرفضان الآن بنفس الحد المسموح.
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
 
 // ═══════════════════════ تنفيذ الدخول (Bracket Order — حماية حقيقية عند الوسيط) ═══════════════════════
@@ -479,14 +480,18 @@ async function executeEntry(signal) {
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
 
-  // ── فحص فجوة التنفيذ: سعر طازج مباشرة قبل إرسال الأمر — لو قفز صعوداً
-  // أكثر من الحد المسموح منذ لحظة اكتشاف الإشارة، نلغي الصفقة بالكامل بدل
-  // ما نشتري بقمة مؤقتة محتملة ──
+  // ── فحص فجوة التنفيذ: سعر طازج مباشرة قبل إرسال الأمر — نرفض الفجوتين:
+  // 1) فجوة صاعدة كبيرة (مطاردة قمة مؤقتة)
+  // 2) فجوة هابطة كبيرة (الزخم الصاعد الذي بُنيت عليه الإشارة قد يكون
+  //    انتهى أو انعكس فعلاً قبل الدخول — اكتُشف هذا النمط بصفقة AMZN
+  //    حيث انخفض السعر 1.53% بين الإشارة والتنفيذ، ودخلنا بسهم يتراجع
+  //    فعلياً عكس فرضيتنا الأصلية) ──
   const freshPrice = await fetchStockPrice(signal.ticker);
   if (freshPrice) {
     const gapPct = ((freshPrice - signal.entry) / signal.entry) * 100;
-    if (gapPct > MAX_ENTRY_GAP_PCT) {
-      throw new Error(`price_gap_too_large: signal=${signal.entry} fresh=${freshPrice} gap=${gapPct.toFixed(2)}%`);
+    if (Math.abs(gapPct) > MAX_ENTRY_GAP_PCT) {
+      const direction = gapPct > 0 ? 'صاعدة (مطاردة قمة)' : 'هابطة (زخم منتهي)';
+      throw new Error(`price_gap_too_large: signal=${signal.entry} fresh=${freshPrice} gap=${gapPct.toFixed(2)}% (${direction})`);
     }
   }
 
