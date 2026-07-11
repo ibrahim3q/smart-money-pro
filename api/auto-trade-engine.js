@@ -21,6 +21,7 @@ import {
   incrementDailyTradeCount,
   setCooldown,
   isCoolingDown,
+  updateTickerStats,
   acquireExecutionLock,
   releaseExecutionLock,
   logDecision,
@@ -110,6 +111,7 @@ export default async function handler(req, res) {
         await logDecision({ type: 'close', position: pos, result });
         await notifyTradeClosed(pos, result).catch(() => {});
         await setCooldown(pos.ticker).catch(() => {});
+        await updateTickerStats(pos.ticker, result.pnl ?? 0).catch(() => {});
       } else {
         stillOpen.push(result.updatedPos || pos);
       }
@@ -238,6 +240,7 @@ async function syncWithBroker() {
       const pnl = (exitPrice - pos.entry) * pos.qty;
       await addToDailyPnL(pnl);
       await setCooldown(pos.ticker).catch(() => {});
+      await updateTickerStats(pos.ticker, pnl).catch(() => {});
       await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
     }
 
