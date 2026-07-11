@@ -1230,6 +1230,14 @@ body::before {
         <div id="at-positions"><div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
       </div>
 
+      <!-- نقاط الثقة التاريخية لكل سهم -->
+      <div class="card mb10">
+        <div class="card-stripe"></div>
+        <div class="card-title">📈 أداء كل سهم على حدة (نقاط الثقة التاريخية)</div>
+        <div style="font-size:8px;color:var(--tx3);margin-bottom:10px">يتراكم تلقائياً من كل صفقة تُغلق — مراقبة بحتة، لا يؤثر على قرارات التنفيذ الحالية</div>
+        <div id="at-ticker-stats"><div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
+      </div>
+
       <!-- سجل القرارات -->
       <div class="card">
         <div class="card-stripe"></div>
@@ -2581,6 +2589,28 @@ async function loadAutoTrade(){
     }
 
     // سجل القرارات
+    // نقاط الثقة التاريخية لكل سهم
+    const statsEl = document.getElementById('at-ticker-stats');
+    if(statsEl){
+      const stats = d.tickerStats||[];
+      statsEl.innerHTML = stats.length===0
+        ? '<div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">لا توجد بيانات كافية بعد — تتراكم مع كل صفقة تُغلق</div>'
+        : `<div style="overflow-x:auto"><table class="sig-tbl" style="font-size:10px">
+            <thead><tr><th>السهم</th><th>الصفقات</th><th>نسبة النجاح</th><th>متوسط الربح/الخسارة</th><th>الإجمالي</th></tr></thead>
+            <tbody>${stats.map(s=>{
+              const wrColor = s.winRate>=60?'var(--green)':s.winRate>=40?'var(--orange)':'var(--red)';
+              const pnlColor = s.totalPnl>=0?'var(--green)':'var(--red)';
+              return `<tr>
+                <td><span class="tk">${s.ticker}</span></td>
+                <td class="pn n">${s.tradesCount}</td>
+                <td class="pn" style="color:${wrColor};font-weight:700">${s.winRate}%</td>
+                <td class="pn" style="color:${pnlColor}">${s.avgPnl>=0?'+':''}$${s.avgPnl}</td>
+                <td class="pn" style="color:${pnlColor};font-weight:700">${s.totalPnl>=0?'+':''}$${s.totalPnl}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table></div>`;
+    }
+
     const decEl = document.getElementById('at-decisions');
     if(decEl){
       const decisions = d.decisions||[];
