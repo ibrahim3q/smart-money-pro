@@ -481,15 +481,17 @@ async function findBestSignal(openPositions) {
     }
 
     // ── فلتر VWAP: السعر لازم يكون فوق متوسط اليوم المرجّح بالحجم —
-    // يؤكد إن زخم اليوم نفسه صاعد فعلاً، مو بس الاتجاه العام طويل المدى ──
-    if (snapshot?.vwap != null && stockPrice < snapshot.vwap) {
+    // يؤكد إن زخم اليوم نفسه صاعد فعلاً، مو بس الاتجاه العام طويل المدى
+    // (معطّل حالياً بقرار 2026-07-13 — يُفعّل عبر AUTO_TRADE_ENABLE_VWAP_FILTER) ──
+    if (ENABLE_VWAP_FILTER && snapshot?.vwap != null && stockPrice < snapshot.vwap) {
       continue; // تحت VWAP اليوم — الزخم اللحظي ضعيف رغم الاتجاه العام
     }
 
     // ── فلتر الحجم النسبي: حجم تداول اليوم لازم يتجاوز ضعف المتوسط
-    // (20 يوم) — يفرّق بين تحرك مؤسسي حقيقي وتذبذب هادئ عادي ──
+    // (20 يوم) — يفرّق بين تحرك مؤسسي حقيقي وتذبذب هادئ عادي
+    // (معطّل حالياً بقرار 2026-07-13 — يُفعّل عبر AUTO_TRADE_ENABLE_VOLUME_FILTER) ──
     let relVolume = null;
-    if (snapshot?.volume) {
+    if (ENABLE_VOLUME_FILTER && snapshot?.volume) {
       const avgVol = await fetchAvgVolume20d(candidate.ticker);
       if (avgVol) {
         relVolume = snapshot.volume / avgVol;
@@ -530,6 +532,13 @@ async function fetchEMA50(ticker) {
 // AMZN بـ-1.53%) = الزخم الصاعد الذي بُنيت عليه الإشارة انتهى أو انعكس
 // فعلاً قبل الدخول. كلا النمطين يُرفضان الآن بنفس الحد المسموح.
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
+
+// ⚠️ مفاتيح تشغيل/إيقاف فلاتر VWAP والحجم النسبي — معطّلة افتراضياً الآن
+// (قرار 2026-07-13: تجربة أسبوع بدونهم لمقارنة عدد/جودة الصفقات، مع إبقاء
+// الكود جاهز للتفعيل الفوري لاحقاً بتغيير قيمة المتغيّر بـVercel فقط،
+// بدون أي تعديل كود إضافي).
+const ENABLE_VWAP_FILTER = (process.env.AUTO_TRADE_ENABLE_VWAP_FILTER || 'false') === 'true';
+const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'false') === 'true';
 
 // ═══════════════════════ تنفيذ الدخول (Bracket Order — حماية حقيقية عند الوسيط) ═══════════════════════
 async function executeEntry(signal) {
