@@ -399,6 +399,42 @@ async function fetchStockPrice(ticker) {
   }
 }
 
+// ── لقطة اليوم الكاملة (سعر + VWAP + حجم تداول اليوم حتى الآن) بطلب واحد ──
+async function fetchDaySnapshot(ticker) {
+  try {
+    const url = `${POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${ticker}&apiKey=${POLYGON_KEY}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const snap = d?.tickers?.[0];
+    if (!snap) return null;
+    return {
+      price: snap.lastTrade?.p || snap.day?.c || null,
+      vwap: snap.day?.vw || null,   // متوسط السعر المرجّح بالحجم لليوم الحالي
+      volume: snap.day?.v || null,  // حجم التداول التراكمي لليوم حتى الآن
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// ── متوسط حجم التداول اليومي آخر 20 يوم تداول — لحساب "الحجم النسبي" ──
+async function fetchAvgVolume20d(ticker) {
+  try {
+    const to = new Date().toISOString().slice(0, 10);
+    const fromD = new Date();
+    fromD.setDate(fromD.getDate() - 30); // 30 يوم تقويمي يضمن ~20 يوم تداول فعلي
+    const from = fromD.toISOString().slice(0, 10);
+    const url = `${POLYGON_BASE}/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=desc&limit=20&apiKey=${POLYGON_KEY}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const results = d?.results || [];
+    if (results.length === 0) return null;
+    return results.reduce((sum, bar) => sum + (bar.v || 0), 0) / results.length;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ═══════════════════════ البحث عن أفضل إشارة (نفس منطق RSI/MACD، أسهم مباشرة) ═══════════════════════
 async function findBestSignal(openPositions) {
   const openTickers = new Set(openPositions.map((p) => p.ticker));
@@ -435,12 +471,30 @@ async function findBestSignal(openPositions) {
   // فعلاً فوق EMA50 (اتجاه صاعد مؤكد) — نتخطى أي مرشّح تحت اتجاهه العام
   // حتى لو زخمه اللحظي (MACD) يبدو قوياً. هذا يمنع الشراء ضد التيار. ──
   for (const candidate of scored) {
-    const stockPrice = await fetchStockPrice(candidate.ticker);
+    const snapshot = await fetchDaySnapshot(candidate.ticker);
+    const stockPrice = snapshot?.price;
     if (!stockPrice) continue;
 
     const ema50 = await fetchEMA50(candidate.ticker);
     if (ema50 != null && stockPrice < ema50) {
       continue; // السهم تحت اتجاهه العام — تخطَّه جرّب التالي
+    }
+
+    // ── فلتر VWAP: السعر لازم يكون فوق متوسط اليوم المرجّح بالحجم —
+    // يؤكد إن زخم اليوم نفسه صاعد فعلاً، مو بس الاتجاه العام طويل المدى ──
+    if (snapshot?.vwap != null && stockPrice < snapshot.vwap) {
+      continue; // تحت VWAP اليوم — الزخم اللحظي ضعيف رغم الاتجاه العام
+    }
+
+    // ── فلتر الحجم النسبي: حجم تداول اليوم لازم يتجاوز ضعف المتوسط
+    // (20 يوم) — يفرّق بين تحرك مؤسسي حقيقي وتذبذب هادئ عادي ──
+    let relVolume = null;
+    if (snapshot?.volume) {
+      const avgVol = await fetchAvgVolume20d(candidate.ticker);
+      if (avgVol) {
+        relVolume = snapshot.volume / avgVol;
+        if (relVolume < 2) continue; // حجم ضعيف — تخطَّه جرّب التالي
+      }
     }
 
     return {
@@ -450,10 +504,12 @@ async function findBestSignal(openPositions) {
       macdHist: candidate.macdHist,
       score: candidate.score,
       ema50,
+      vwap: snapshot?.vwap ?? null,
+      relVolume: relVolume != null ? +relVolume.toFixed(2) : null,
     };
   }
 
-  return null; // ولا مرشّح واحد اجتاز فلتر الاتجاه العام
+  return null; // ولا مرشّح واحد اجتاز كل الفلاتر
 }
 
 // ═══════════════════════ EMA50 يومي — لتأكيد الاتجاه العام ═══════════════════════
@@ -539,7 +595,7 @@ async function executeEntry(signal) {
     takeProfitOrderId,
     stopLossOrderId,
     openedAt: new Date().toISOString(),
-    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}`,
+    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}${signal.vwap ? ` + فوق VWAP (${signal.vwap.toFixed(2)})` : ''}${signal.relVolume ? ` + حجم نسبي ${signal.relVolume}×` : ''}`,
     riskAmt,
     signalPrice: signal.entry, // نحتفظ بسعر الإشارة الأصلي للمقارنة والتحليل لاحقاً
   };
