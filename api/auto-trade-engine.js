@@ -31,7 +31,9 @@ import {
   getAccount,
   getPositions,
   openEquityMarketOrder,
+  openEquityLimitOrder,
   pollOrderFill,
+  pollOrderFillOrCancel,
   placeOCOExit,
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
@@ -548,12 +550,9 @@ async function executeEntry(signal) {
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
 
-  // ── فحص فجوة التنفيذ: سعر طازج مباشرة قبل إرسال الأمر — نرفض الفجوتين:
-  // 1) فجوة صاعدة كبيرة (مطاردة قمة مؤقتة)
-  // 2) فجوة هابطة كبيرة (الزخم الصاعد الذي بُنيت عليه الإشارة قد يكون
-  //    انتهى أو انعكس فعلاً قبل الدخول — اكتُشف هذا النمط بصفقة AMZN
-  //    حيث انخفض السعر 1.53% بين الإشارة والتنفيذ، ودخلنا بسهم يتراجع
-  //    فعلياً عكس فرضيتنا الأصلية) ──
+  // ── فحص فجوة التنفيذ الأولي: سعر طازج قبل أي إرسال — يرفض فوراً لو
+  // السعر تحرك كثير (بالاتجاهين) منذ لحظة اكتشاف الإشارة، قبل ما نكلّف
+  // أنفسنا بإرسال أي أمر أصلاً ──
   const freshPrice = await fetchStockPrice(signal.ticker);
   if (freshPrice) {
     const gapPct = ((freshPrice - signal.entry) / signal.entry) * 100;
@@ -563,11 +562,16 @@ async function executeEntry(signal) {
     }
   }
 
-  // ── 1) الدخول: أمر سوق بسيط بدون أرجل حماية مربوطة بعد ──
-  const entryOrder = await openEquityMarketOrder({ symbol: signal.ticker, qty: shares });
+  // ── 1) الدخول: أمر حدّي بسقف صارم = signal.entry × (1 + الفجوة المسموحة) ──
+  // بعكس أمر السوق، هذا يضمن رياضياً عدم التنفيذ فوق السقف مهما تحرك
+  // السعر بين الفحص أعلاه ولحظة التنفيذ الفعلي — يسدّ بالضبط الفجوة التي
+  // نفّذت صفقة META بانحراف 1.37% رغم اجتياز الفحص المسبق بنجاح.
+  const ceilingPrice = +(signal.entry * (1 + MAX_ENTRY_GAP_PCT / 100)).toFixed(2);
+  const entryOrder = await openEquityLimitOrder({ symbol: signal.ticker, qty: shares, limitPrice: ceilingPrice });
 
-  // ── 2) ننتظر تأكيد التنفيذ الفعلي ونجيب السعر الحقيقي ──
-  const filledOrder = await pollOrderFill(entryOrder.id);
+  // ── 2) ننتظر تأكيد التنفيذ الفعلي؛ لو ما امتلأ خلال المهلة (تجاوز
+  // السقف)، يُلغى تلقائياً — نفوّت الصفقة عن قصد بدل مطاردتها ──
+  const filledOrder = await pollOrderFillOrCancel(entryOrder.id);
   const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
 
   // ── 3) نحسب الهدف والوقف من السعر الحقيقي (مو سعر الإشارة القديم) ──
