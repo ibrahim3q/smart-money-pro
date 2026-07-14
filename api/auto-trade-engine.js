@@ -38,6 +38,7 @@ import {
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
   getOrder,
+  getOrderNested,
 } from '../lib/alpaca.js';
 
 import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker } from '../lib/notify.js';
@@ -268,13 +269,15 @@ function isMarketOpenNow(ny) {
   return mins >= 570 && mins < 960; // 9:30 - 16:00 ET فقط
 }
 
-// ── نافذة الدخول: من 9:45 فقط (مو 9:30) ──
-// أول 15 دقيقة من الجلسة هي الأكثر تقلباً وتضليلاً: فجوات افتتاح، أوامر
-// متراكمة من الليل، وحركات وهمية تنعكس سريعاً. المراقبة والإغلاق يبقيان
-// نشطين من 9:30، لكن فتح صفقات جديدة يبدأ بعد استقرار الافتتاح.
+// ── نافذة الدخول: من 9:45 حتى 15:45 (مو 15:55) ──
+// أول 15 دقيقة من الجلسة هي الأكثر تقلباً وتضليلاً. وبنفس المنطق، آخر 10
+// دقائق قبل كنسة نهاية اليوم (15:55) غير كافية لأي صفقة جديدة تتطور —
+// اكتُشف هذا بعد صفقة META (14 يوليو) اللي عاشت 6 دقائق بس بلا معنى قبل
+// إغلاقها قسراً. المراقبة والإغلاق يبقيان نشطين من 9:30 حتى 15:55 كاملة،
+// لكن فتح صفقات جديدة يتوقف بهامش أمان أبكر.
 function isEntryWindowOpen(ny) {
   const mins = ny.getHours() * 60 + ny.getMinutes();
-  return mins >= 585 && mins < 955; // 9:45 حتى 15:55 ET
+  return mins >= 585 && mins < 945; // 9:45 حتى 15:45 ET
 }
 
 // ═══════════════════════ صمّام أمان: تحقق من الحساب الحقيقي ═══════════════════════
@@ -588,9 +591,14 @@ async function executeEntry(signal) {
       takeProfitPrice: targetPrice,
       stopLossPrice: stopPrice,
     });
-    const legs = ocoOrder.legs || [ocoOrder];
+    // ⚠️ الرد الفوري بعد الإنشاء لا يضمن تضمين legs — نطلبها صراحة بـnested=true
+    const ocoDetailed = await getOrderNested(ocoOrder.id).catch(() => ocoOrder);
+    const legs = ocoDetailed.legs || ocoOrder.legs || [];
     takeProfitOrderId = legs.find((l) => l.type === 'limit')?.id || null;
     stopLossOrderId = legs.find((l) => l.type === 'stop')?.id || null;
+    if (!takeProfitOrderId || !stopLossOrderId) {
+      console.error('OCO legs incomplete after nested fetch:', JSON.stringify(legs));
+    }
   } catch (e) {
     console.error('OCO exit placement failed:', e.message);
     // الصفقة مفتوحة بدون حماية عند الوسيط — evaluatePosition() بالفحص
