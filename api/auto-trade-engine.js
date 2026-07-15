@@ -1,13 +1,5 @@
 // api/auto-trade-engine.js
-// نسخة الأسهم — مضاربة يومية محافظة (Day Trading): هدف صغير، وقف أصغر،
-// إغلاق إجباري بنفس اليوم بدون استثناء. يُستدعى من Vercel Cron كل دقيقتين.
-//
-// الفرق الجوهري عن نسخة الخيارات السابقة:
-// 1. Bracket Orders مدعومة رسمياً للأسهم — الحماية تعيش عند الوسيط من لحظة
-//    التنفيذ، مو معتمدة على استمرار عمل الـCron.
-// 2. سيولة الأسهم الكبيرة عميقة جداً — ما نحتاج فلتر سبريد معقد زي الخيارات.
-// 3. صمّام أمان جديد: مقارنة رأس المال المُعلن بالحساب الحقيقي عند Alpaca،
-//    وسقف صارم لأقصى مخاطرة مسموحة لكل صفقة (يمنع تكرار خطأ RISK_PCT اليوم).
+// نسخة الأسهم — مضاربة يومية محافظة (Day Trading)
 
 import {
   isKillSwitchActive,
@@ -32,29 +24,24 @@ import {
   getPositions,
   openEquityMarketOrder,
   openEquityLimitOrder,
-  pollOrderFill,
   pollOrderFillOrCancel,
   placeOCOExit,
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
+  fetchRecentSellOrdersForSymbol,
   getOrder,
-  getOrderNested,
 } from '../lib/alpaca.js';
 
 import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker } from '../lib/notify.js';
 
-// ── إعدادات المخاطرة (Environment Variables، بقيم افتراضية آمنة لمضاربة يومية) ──
+// ── إعدادات المخاطرة ──
 const CAPITAL = parseFloat(process.env.AUTO_TRADE_CAPITAL || '1000');
 const RISK_PCT = parseFloat(process.env.AUTO_TRADE_RISK_PCT || '2');
 const DAILY_LOSS_LIMIT_PCT = parseFloat(process.env.AUTO_TRADE_DAILY_LOSS_PCT || '3');
 const MAX_OPEN_POSITIONS = parseInt(process.env.AUTO_TRADE_MAX_POSITIONS || '2', 10);
 const MAX_DAILY_TRADES = parseInt(process.env.AUTO_TRADE_MAX_DAILY_TRADES || '5', 10);
-const TARGET_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_TARGET_PCT || '1.5') / 100; // افتراضي 1.5%
-const STOP_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_STOP_PCT || '0.75') / 100;    // افتراضي 0.75% (R:R = 2:1)
-
-// ⚠️ سقف صارم: مهما كانت قيمة RISK_PCT، أقصى مخاطرة لصفقة واحدة لا تتجاوز
-// هذه النسبة من رأس المال إطلاقاً. هذا بالضبط الحاجز اللي كان ناقص اليوم
-// ومنع تحديد خطأ كتابي (RISK_PCT=20 بدل 2) من التسبب بخسارة 142% من رأس المال.
+const TARGET_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_TARGET_PCT || '1.5') / 100;
+const STOP_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_STOP_PCT || '0.75') / 100;
 const HARD_MAX_RISK_PCT = 5;
 
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
@@ -71,14 +58,12 @@ export default async function handler(req, res) {
 
   const runLog = { opened: null, closed: [] };
 
-  // ── قفل التنفيذ: لو فيه دورة ثانية شغالة حالياً، ننسحب فوراً بدل ما نتداخل معها ──
   const lockAcquired = await acquireExecutionLock();
   if (!lockAcquired) {
     return res.status(200).json({ status: 'skipped', reason: 'another_cycle_running' });
   }
 
   try {
-    // ── 1. Kill Switch أولاً ──
     if (await isKillSwitchActive()) {
       await logDecision({ type: 'skip', reason: 'kill_switch_active' });
       return res.status(200).json({ status: 'halted', reason: 'kill_switch_active' });
@@ -86,20 +71,14 @@ export default async function handler(req, res) {
 
     const nowET = nowInET();
 
-    // ── 2. خارج ساعات التداول؟ ──
     if (!isMarketOpenNow(nowET)) {
       return res.status(200).json({ status: 'skipped', reason: 'market_closed' });
     }
 
-    // ── 2.5 مزامنة مع Alpaca: الوسيط هو مصدر الحقيقة النهائي للمراكز ──
-    // لو bracket order أغلق صفقة (هدف/وقف) بين دورتين، سجلنا الداخلي ما يدري.
-    // هنا نصحح السجل ونحسب الـPnL الفائت قبل أي قرار جديد.
     await syncWithBroker();
 
-    // ── 3. كنسة نهاية اليوم — إغلاق إجباري لأي مركز مفتوح قبل الإغلاق ──
-    // (مضاربة يومية = صفر ترحيل لليوم التالي، بدون أي استثناء)
     const minsNow = nowET.getHours() * 60 + nowET.getMinutes();
-    const isEndOfDaySweep = minsNow >= 955; // 15:55 ET — قبل الإغلاق بـ5 دقائق
+    const isEndOfDaySweep = minsNow >= 955;
 
     let openPositions = await getOpenPositions();
     const stillOpen = [];
@@ -123,11 +102,9 @@ export default async function handler(req, res) {
     openPositions = stillOpen;
 
     if (isEndOfDaySweep) {
-      // بعد كنسة نهاية اليوم، لا نفتح صفقات جديدة إطلاقاً
       return res.status(200).json({ status: 'end_of_day_sweep', closed: runLog.closed });
     }
 
-    // ── 4. قاطع الدائرة اليومي ──
     const dailyPnL = await getDailyPnL();
     const dailyLossLimit = -(CAPITAL * DAILY_LOSS_LIMIT_PCT / 100);
     if (dailyPnL <= dailyLossLimit && !(await isCircuitBreakerTripped())) {
@@ -139,47 +116,38 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'circuit_breaker_active', dailyPnL, closed: runLog.closed });
     }
 
-    // ── 5. حد الصفقات المفتوحة ──
     if (openPositions.length >= MAX_OPEN_POSITIONS) {
       await logDecision({ type: 'skip', reason: 'max_positions_reached', count: openPositions.length });
       return res.status(200).json({ status: 'max_positions', closed: runLog.closed });
     }
 
-    // ── 5.5 حد عدد الصفقات اليومي (منفصل عن حد الصفقات المفتوحة بنفس الوقت) ──
     const dailyTradeCount = await getDailyTradeCount();
     if (dailyTradeCount >= MAX_DAILY_TRADES) {
       await logDecision({ type: 'skip', reason: 'max_daily_trades_reached', count: dailyTradeCount });
       return res.status(200).json({ status: 'max_daily_trades', dailyTradeCount, closed: runLog.closed });
     }
 
-    // ── 5.7 نافذة الدخول: لا صفقات جديدة بأول 15 دقيقة من الجلسة ──
     if (!isEntryWindowOpen(nowET)) {
       await logDecision({ type: 'skip', reason: 'outside_entry_window' });
       return res.status(200).json({ status: 'outside_entry_window', closed: runLog.closed });
     }
 
-    // ── 6. صمّام أمان: تحقق من الحساب الحقيقي عند Alpaca قبل أي حساب حجم صفقة ──
     const sanityCheck = await verifyAccountSanity();
     if (!sanityCheck.ok) {
       await logDecision({ type: 'skip', reason: 'account_sanity_check_failed', details: sanityCheck });
       return res.status(200).json({ status: 'sanity_check_failed', details: sanityCheck, closed: runLog.closed });
     }
 
-    // ── 7. البحث عن إشارة ──
     const signal = await findBestSignal(openPositions);
     if (!signal) {
       await logDecision({ type: 'no_signal' });
       return res.status(200).json({ status: 'no_signal', closed: runLog.closed });
     }
 
-    // ── 8. التنفيذ ──
     let opened;
     try {
       opened = await executeEntry(signal);
     } catch (execErr) {
-      // فشل التنفيذ (زي: السعر تحرك بين القرار والإرسال) — نسجّل، نعطي
-      // السهم تهدئة قصيرة (دقيقتين، أقصر من تهدئة الإغلاق العادي)، ونكمل
-      // بهدوء بدل ما نفشل الدورة كاملة بخطأ 500
       await setCooldown(signal.ticker, 120).catch(() => {});
       await logDecision({ type: 'error', message: execErr.message, ticker: signal.ticker }).catch(() => {});
       return res.status(200).json({ status: 'entry_failed', ticker: signal.ticker, error: execErr.message, closed: runLog.closed });
@@ -196,15 +164,11 @@ export default async function handler(req, res) {
     await logDecision({ type: 'error', message: err.message }).catch(() => {});
     return res.status(500).json({ error: err.message });
   } finally {
-    // تحرير القفل دائماً — حتى لو صار خطأ، الدورة القادمة تشتغل طبيعي
     await releaseExecutionLock().catch(() => {});
   }
 }
 
-// ═══════════════════════ مزامنة مع الوسيط (مصدر الحقيقة النهائي) ═══════════════════════
-// يقارن سجلنا الداخلي بالمراكز الفعلية عند Alpaca. لو صفقة اختفت من الوسيط
-// (أغلقها bracket order بين دورتين)، نتحقق من أرجل الأمر لمعرفة سعر الخروج
-// الفعلي، نحسب الـPnL الصحيح، ونحدّث قاطع الدائرة — بدل ما تضيع الخسارة/الربح.
+// ═══════════════════════ مزامنة مع الوسيط ═══════════════════════
 async function syncWithBroker() {
   try {
     const localPositions = await getOpenPositions();
@@ -216,11 +180,10 @@ async function syncWithBroker() {
     const stillOpen = [];
     for (const pos of localPositions) {
       if (brokerSymbols.has(pos.ticker)) {
-        stillOpen.push(pos); // لسا مفتوحة فعلاً عند الوسيط
+        stillOpen.push(pos);
         continue;
       }
 
-      // المركز اختفى من الوسيط — أغلقه bracket order غالباً. نجيب سعر الخروج الفعلي.
       let exitPrice = null;
       let closeReason = 'closed_at_broker_unknown_leg';
 
@@ -235,7 +198,6 @@ async function syncWithBroker() {
         closeReason = 'stop_loss_filled_synced';
       }
 
-      // لو ما قدرنا نحدد الرجل المنفذة، نستخدم آخر سعر معروف كتقدير متحفظ
       if (exitPrice == null) {
         exitPrice = (await fetchStockPrice(pos.ticker)) || pos.entry;
       }
@@ -251,7 +213,6 @@ async function syncWithBroker() {
       await setOpenPositions(stillOpen);
     }
   } catch (err) {
-    // فشل المزامنة لا يوقف الدورة — الفحص المباشر بevaluatePosition يغطي كطبقة ثانية
     console.error('syncWithBroker error:', err.message);
   }
 }
@@ -266,33 +227,23 @@ function isMarketOpenNow(ny) {
   const dateStr = ny.toISOString().slice(0, 10);
   if (US_HOLIDAYS_2026.includes(dateStr)) return false;
   const mins = ny.getHours() * 60 + ny.getMinutes();
-  return mins >= 570 && mins < 960; // 9:30 - 16:00 ET فقط
+  return mins >= 570 && mins < 960;
 }
 
-// ── نافذة الدخول: من 9:45 حتى 15:45 (مو 15:55) ──
-// أول 15 دقيقة من الجلسة هي الأكثر تقلباً وتضليلاً. وبنفس المنطق، آخر 10
-// دقائق قبل كنسة نهاية اليوم (15:55) غير كافية لأي صفقة جديدة تتطور —
-// اكتُشف هذا بعد صفقة META (14 يوليو) اللي عاشت 6 دقائق بس بلا معنى قبل
-// إغلاقها قسراً. المراقبة والإغلاق يبقيان نشطين من 9:30 حتى 15:55 كاملة،
-// لكن فتح صفقات جديدة يتوقف بهامش أمان أبكر.
 function isEntryWindowOpen(ny) {
   const mins = ny.getHours() * 60 + ny.getMinutes();
-  return mins >= 585 && mins < 945; // 9:45 حتى 15:45 ET
+  return mins >= 585 && mins < 945;
 }
 
-// ═══════════════════════ صمّام أمان: تحقق من الحساب الحقيقي ═══════════════════════
+// ═══════════════════════ صمّام أمان ═══════════════════════
 async function verifyAccountSanity() {
   try {
     const account = await getAccount();
     const buyingPower = parseFloat(account.buying_power || 0);
     const equity = parseFloat(account.equity || 0);
-
-    // لو الحساب الحقيقي (paper) ما فيه سيولة كافية لأقل صفقة منطقية، أوقف
     if (buyingPower < 50) {
       return { ok: false, reason: 'insufficient_buying_power', buyingPower };
     }
-    // لو رأس المال المُعلن بالإعدادات (CAPITAL) أعلى بكثير من الحساب الفعلي،
-    // هذا مؤشر خطأ إعداد — أوقف بدل ما نخاطر بحجم صفقة غير واقعي
     if (CAPITAL > equity * 3) {
       return { ok: false, reason: 'capital_mismatch', configured: CAPITAL, actualEquity: equity };
     }
@@ -302,17 +253,12 @@ async function verifyAccountSanity() {
   }
 }
 
-// ═══════════════════════ مراقبة/إغلاق صفقة مفتوحة (أثناء اليوم) ═══════════════════════
-// ⚠️ إعدادات قفل الربح المتحرك — يُفعّل بعد ما يصل السعر 70% من الطريق
-// للهدف، ويغلق فوراً لو ارتد 25% من الربح المتحقق من أعلى نقطة وصلها.
-// يحل مشكلة "الاقتراب من الهدف بدون لمسه ثم الارتداد الكامل" المكتشفة
-// بالمراقبة اليدوية — قفل ربح جزئي مؤكد أفضل من المخاطرة بضياعه بالكامل.
+// ═══════════════════════ مراقبة/إغلاق صفقة مفتوحة ═══════════════════════
 const TRAILING_LOCK_TRIGGER_PROGRESS = 0.80;
 const TRAILING_LOCK_PULLBACK_PCT = 0.25;
 
 async function evaluatePosition(pos) {
   try {
-    // نتحقق أولاً هل أحد أرجل الـ Bracket اتنفذ فعلاً عند الوسيط (المصدر الأدق والأسرع)
     if (pos.takeProfitOrderId) {
       const tp = await getOrder(pos.takeProfitOrderId).catch(() => null);
       if (tp?.status === 'filled') {
@@ -330,13 +276,10 @@ async function evaluatePosition(pos) {
       }
     }
 
-    // شبكة أمان مباشرة إضافية: نفحص السعر اللحظي الحقيقي من Polygon كتأكيد ثانٍ
     const price = await fetchStockPrice(pos.ticker);
     if (price == null) return { closed: false, reason: 'no_quote', updatedPos: pos };
 
     if (price >= pos.target || price <= pos.stopLoss) {
-      // الحماية عند الوسيط لازم تكون تكفلت فيها أصلاً (bracket)، لكن لو لأي
-      // سبب لسا مفتوحة، نغلق يدوياً كطبقة أمان أخيرة
       await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
       const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
       const exitPrice = parseFloat(closeOrder.filled_avg_price || price);
@@ -349,7 +292,6 @@ async function evaluatePosition(pos) {
       };
     }
 
-    // ── قفل الربح المتحرك ──
     const distanceToTarget = pos.target - pos.entry;
     const peakPrice = Math.max(pos.peakPrice || pos.entry, price);
     const peakProgress = distanceToTarget > 0 ? (peakPrice - pos.entry) / distanceToTarget : 0;
@@ -369,14 +311,13 @@ async function evaluatePosition(pos) {
       }
     }
 
-    // لسا مفتوحة — نحفظ القمة المحدّثة لتُستخدم بالدورة القادمة
     return { closed: false, currentPrice: price, updatedPos: { ...pos, peakPrice } };
   } catch (err) {
     return { closed: false, reason: 'evaluation_error', error: err.message, updatedPos: pos };
   }
 }
 
-// ═══════════════════════ إغلاق إجباري بنهاية اليوم (بدون شروط) ═══════════════════════
+// ═══════════════════════ إغلاق إجباري بنهاية اليوم ═══════════════════════
 async function forceCloseEndOfDay(pos) {
   try {
     await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
@@ -391,7 +332,7 @@ async function forceCloseEndOfDay(pos) {
   }
 }
 
-// ═══════════════════════ سعر السهم اللحظي ═══════════════════════
+// ═══════════════════════ بيانات السوق ═══════════════════════
 async function fetchStockPrice(ticker) {
   try {
     const url = `${POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${ticker}&apiKey=${POLYGON_KEY}`;
@@ -404,7 +345,6 @@ async function fetchStockPrice(ticker) {
   }
 }
 
-// ── لقطة اليوم الكاملة (سعر + VWAP + حجم تداول اليوم حتى الآن) بطلب واحد ──
 async function fetchDaySnapshot(ticker) {
   try {
     const url = `${POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${ticker}&apiKey=${POLYGON_KEY}`;
@@ -414,20 +354,19 @@ async function fetchDaySnapshot(ticker) {
     if (!snap) return null;
     return {
       price: snap.lastTrade?.p || snap.day?.c || null,
-      vwap: snap.day?.vw || null,   // متوسط السعر المرجّح بالحجم لليوم الحالي
-      volume: snap.day?.v || null,  // حجم التداول التراكمي لليوم حتى الآن
+      vwap: snap.day?.vw || null,
+      volume: snap.day?.v || null,
     };
   } catch (e) {
     return null;
   }
 }
 
-// ── متوسط حجم التداول اليومي آخر 20 يوم تداول — لحساب "الحجم النسبي" ──
 async function fetchAvgVolume20d(ticker) {
   try {
     const to = new Date().toISOString().slice(0, 10);
     const fromD = new Date();
-    fromD.setDate(fromD.getDate() - 30); // 30 يوم تقويمي يضمن ~20 يوم تداول فعلي
+    fromD.setDate(fromD.getDate() - 30);
     const from = fromD.toISOString().slice(0, 10);
     const url = `${POLYGON_BASE}/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=desc&limit=20&apiKey=${POLYGON_KEY}`;
     const r = await fetch(url);
@@ -440,12 +379,14 @@ async function fetchAvgVolume20d(ticker) {
   }
 }
 
-// ═══════════════════════ البحث عن أفضل إشارة (نفس منطق RSI/MACD، أسهم مباشرة) ═══════════════════════
+// ═══════════════════════ البحث عن أفضل إشارة ═══════════════════════
+const ENABLE_VWAP_FILTER = (process.env.AUTO_TRADE_ENABLE_VWAP_FILTER || 'false') === 'true';
+const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'false') === 'true';
+
 async function findBestSignal(openPositions) {
   const openTickers = new Set(openPositions.map((p) => p.ticker));
   const candidatesRaw = WATCHLIST.filter((t) => !openTickers.has(t));
 
-  // استبعد أي سهم بفترة تهدئة (أُغلق أو فشلت محاولة فتحه مؤخراً)
   const cooldownChecks = await Promise.all(candidatesRaw.map((t) => isCoolingDown(t)));
   const candidates = candidatesRaw.filter((_, i) => !cooldownChecks[i]);
 
@@ -472,35 +413,22 @@ async function findBestSignal(openPositions) {
   if (scored.length === 0) return null;
   scored.sort((a, b) => b.score - a.score);
 
-  // ── فلتر الاتجاه العام: نتحقق من كل مرشّح بترتيب القوة، ونقبل أول واحد
-  // فعلاً فوق EMA50 (اتجاه صاعد مؤكد) — نتخطى أي مرشّح تحت اتجاهه العام
-  // حتى لو زخمه اللحظي (MACD) يبدو قوياً. هذا يمنع الشراء ضد التيار. ──
   for (const candidate of scored) {
     const snapshot = await fetchDaySnapshot(candidate.ticker);
     const stockPrice = snapshot?.price;
     if (!stockPrice) continue;
 
     const ema50 = await fetchEMA50(candidate.ticker);
-    if (ema50 != null && stockPrice < ema50) {
-      continue; // السهم تحت اتجاهه العام — تخطَّه جرّب التالي
-    }
+    if (ema50 != null && stockPrice < ema50) continue;
 
-    // ── فلتر VWAP: السعر لازم يكون فوق متوسط اليوم المرجّح بالحجم —
-    // يؤكد إن زخم اليوم نفسه صاعد فعلاً، مو بس الاتجاه العام طويل المدى
-    // (معطّل حالياً بقرار 2026-07-13 — يُفعّل عبر AUTO_TRADE_ENABLE_VWAP_FILTER) ──
-    if (ENABLE_VWAP_FILTER && snapshot?.vwap != null && stockPrice < snapshot.vwap) {
-      continue; // تحت VWAP اليوم — الزخم اللحظي ضعيف رغم الاتجاه العام
-    }
+    if (ENABLE_VWAP_FILTER && snapshot?.vwap != null && stockPrice < snapshot.vwap) continue;
 
-    // ── فلتر الحجم النسبي: حجم تداول اليوم لازم يتجاوز ضعف المتوسط
-    // (20 يوم) — يفرّق بين تحرك مؤسسي حقيقي وتذبذب هادئ عادي
-    // (معطّل حالياً بقرار 2026-07-13 — يُفعّل عبر AUTO_TRADE_ENABLE_VOLUME_FILTER) ──
     let relVolume = null;
     if (ENABLE_VOLUME_FILTER && snapshot?.volume) {
       const avgVol = await fetchAvgVolume20d(candidate.ticker);
       if (avgVol) {
         relVolume = snapshot.volume / avgVol;
-        if (relVolume < 2) continue; // حجم ضعيف — تخطَّه جرّب التالي
+        if (relVolume < 2) continue;
       }
     }
 
@@ -516,10 +444,9 @@ async function findBestSignal(openPositions) {
     };
   }
 
-  return null; // ولا مرشّح واحد اجتاز كل الفلاتر
+  return null;
 }
 
-// ═══════════════════════ EMA50 يومي — لتأكيد الاتجاه العام ═══════════════════════
 async function fetchEMA50(ticker) {
   try {
     const url = `${POLYGON_BASE}/v1/indicators/ema/${ticker}?timespan=day&adjusted=true&window=50&series_type=close&limit=1&apiKey=${POLYGON_KEY}`;
@@ -527,35 +454,18 @@ async function fetchEMA50(ticker) {
     const d = await r.json();
     return d?.results?.values?.[0]?.value ?? null;
   } catch (e) {
-    return null; // فشل الجلب — لا نمنع الصفقة بسبب هذا وحده، نتركه يمر (fail-open على هذا الفلتر تحديداً)
+    return null;
   }
 }
 
-// ⚠️ أقصى فجوة مسموحة (بالاتجاهين) بين سعر الإشارة ولحظة التنفيذ.
-// اكتُشف هذا الفلتر بعد تحليل عدة أيام بيانات: فجوة صاعدة كبيرة (>1%)
-// = مطاردة قمة مؤقتة (خسرت خلال دقائق كل مرة). فجوة هابطة كبيرة (مثل
-// AMZN بـ-1.53%) = الزخم الصاعد الذي بُنيت عليه الإشارة انتهى أو انعكس
-// فعلاً قبل الدخول. كلا النمطين يُرفضان الآن بنفس الحد المسموح.
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
 
-// ⚠️ مفاتيح تشغيل/إيقاف فلاتر VWAP والحجم النسبي — معطّلة افتراضياً الآن
-// (قرار 2026-07-13: تجربة أسبوع بدونهم لمقارنة عدد/جودة الصفقات، مع إبقاء
-// الكود جاهز للتفعيل الفوري لاحقاً بتغيير قيمة المتغيّر بـVercel فقط،
-// بدون أي تعديل كود إضافي).
-const ENABLE_VWAP_FILTER = (process.env.AUTO_TRADE_ENABLE_VWAP_FILTER || 'false') === 'true';
-const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'false') === 'true';
-
-// ═══════════════════════ تنفيذ الدخول (Bracket Order — حماية حقيقية عند الوسيط) ═══════════════════════
+// ═══════════════════════ تنفيذ الدخول ═══════════════════════
 async function executeEntry(signal) {
-  // ── حساب حجم الصفقة (تقديري، مبني على سعر الإشارة — الكمية نفسها لا
-  // تتأثر بفروقات الأسعار الصغيرة بقدر ما يتأثر بها الهدف/الوقف) ──
   const effectiveRiskPct = Math.min(RISK_PCT, HARD_MAX_RISK_PCT);
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
 
-  // ── فحص فجوة التنفيذ الأولي: سعر طازج قبل أي إرسال — يرفض فوراً لو
-  // السعر تحرك كثير (بالاتجاهين) منذ لحظة اكتشاف الإشارة، قبل ما نكلّف
-  // أنفسنا بإرسال أي أمر أصلاً ──
   const freshPrice = await fetchStockPrice(signal.ticker);
   if (freshPrice) {
     const gapPct = ((freshPrice - signal.entry) / signal.entry) * 100;
@@ -565,51 +475,43 @@ async function executeEntry(signal) {
     }
   }
 
-  // ── 1) الدخول: أمر حدّي بسقف صارم = signal.entry × (1 + الفجوة المسموحة) ──
-  // بعكس أمر السوق، هذا يضمن رياضياً عدم التنفيذ فوق السقف مهما تحرك
-  // السعر بين الفحص أعلاه ولحظة التنفيذ الفعلي — يسدّ بالضبط الفجوة التي
-  // نفّذت صفقة META بانحراف 1.37% رغم اجتياز الفحص المسبق بنجاح.
   const ceilingPrice = +(signal.entry * (1 + MAX_ENTRY_GAP_PCT / 100)).toFixed(2);
   const entryOrder = await openEquityLimitOrder({ symbol: signal.ticker, qty: shares, limitPrice: ceilingPrice });
 
-  // ── 2) ننتظر تأكيد التنفيذ الفعلي؛ لو ما امتلأ خلال المهلة (تجاوز
-  // السقف)، يُلغى تلقائياً — نفوّت الصفقة عن قصد بدل مطاردتها ──
   const filledOrder = await pollOrderFillOrCancel(entryOrder.id);
   const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
 
-  // ── 3) نحسب الهدف والوقف من السعر الحقيقي (مو سعر الإشارة القديم) ──
   const targetPrice = +(realEntryPrice * (1 + TARGET_PCT)).toFixed(2);
   const stopPrice = +(realEntryPrice * (1 - STOP_PCT)).toFixed(2);
 
-  // ── 4) نربط الحماية الآن بالسعر الصحيح عبر أمر OCO ──
+  // ── ربط الحماية بأمر OCO، ثم تحديد معرّفات الأرجل عبر استعلام مباشر
+  // بالرمز (موثوق) بدل الاعتماد على حقل legs بالأمر الأب (ثبت أنه غير
+  // موثوق دائماً بمنصة Alpaca لأوامر OCO — موثّق بشكاوى مجتمعية) ──
   let takeProfitOrderId = null;
   let stopLossOrderId = null;
   try {
-    const ocoOrder = await placeOCOExit({
+    await placeOCOExit({
       symbol: signal.ticker,
       qty: shares,
       takeProfitPrice: targetPrice,
       stopLossPrice: stopPrice,
     });
-    // ⚠️ الرد الفوري بعد الإنشاء لا يضمن تضمين legs — نطلبها صراحة بـnested=true
-    const ocoDetailed = await getOrderNested(ocoOrder.id).catch(() => ocoOrder);
-    const legs = ocoDetailed.legs || ocoOrder.legs || [];
-    takeProfitOrderId = legs.find((l) => l.type === 'limit')?.id || null;
-    stopLossOrderId = legs.find((l) => l.type === 'stop')?.id || null;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const legsResult = await fetchRecentSellOrdersForSymbol(signal.ticker, shares);
+    takeProfitOrderId = legsResult.takeProfitOrderId;
+    stopLossOrderId = legsResult.stopLossOrderId;
     if (!takeProfitOrderId || !stopLossOrderId) {
-      console.error('OCO legs incomplete after nested fetch:', JSON.stringify(legs));
+      console.error('OCO legs incomplete after direct query:', JSON.stringify(legsResult.raw));
     }
   } catch (e) {
     console.error('OCO exit placement failed:', e.message);
-    // الصفقة مفتوحة بدون حماية عند الوسيط — evaluatePosition() بالفحص
-    // المباشر للسعر يبقى شبكة الأمان الأخيرة حتى لو فشل هذا الأمر
   }
 
   const position = {
     id: entryOrder.id,
     ticker: signal.ticker,
-    entry: realEntryPrice, // السعر الحقيقي، مو سعر الإشارة
-    peakPrice: realEntryPrice, // لتتبّع قفل الربح المتحرك لاحقاً
+    entry: realEntryPrice,
+    peakPrice: realEntryPrice,
     qty: shares,
     target: targetPrice,
     stopLoss: stopPrice,
@@ -618,7 +520,7 @@ async function executeEntry(signal) {
     openedAt: new Date().toISOString(),
     reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}${signal.vwap ? ` + فوق VWAP (${signal.vwap.toFixed(2)})` : ''}${signal.relVolume ? ` + حجم نسبي ${signal.relVolume}×` : ''}`,
     riskAmt,
-    signalPrice: signal.entry, // نحتفظ بسعر الإشارة الأصلي للمقارنة والتحليل لاحقاً
+    signalPrice: signal.entry,
   };
 
   const openPositions = await getOpenPositions();
