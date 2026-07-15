@@ -515,8 +515,27 @@ const ATR_STOP_MULTIPLIER = parseFloat(process.env.AUTO_TRADE_ATR_STOP_MULTIPLIE
 const ATR_TARGET_MULTIPLIER = parseFloat(process.env.AUTO_TRADE_ATR_TARGET_MULTIPLIER || '2.0'); // يحافظ على R:R = 2:1
 
 // ═══════════════════════ تنفيذ الدخول ═══════════════════════
+// ⚠️ تصنيف قوة الإشارة — مبني على دليل حقيقي من بياناتنا، مو تخمين نظري:
+// MACD متطرف (>6) كان نمط META الخطر (مطاردة قمة تنعكس بسرعة)، بينما
+// فجوة EMA50 كبيرة + MACD معتدل (زي AAPL بثبات) كانت الأكثر موثوقية.
+// لهذا لا نستخدم "score" الخام (يكبر مع MACD المتطرف) كمقياس قوة، بل
+// نصنّف صراحة بناءً على الدرس المستفاد.
+function classifySignalQuality(signal) {
+  const emaGapPct = signal.ema50 ? ((signal.entry - signal.ema50) / signal.ema50) * 100 : null;
+  const macdHist = signal.macdHist;
+
+  const isWeak = macdHist > 6 || (emaGapPct != null && emaGapPct < 1);
+  if (isWeak) return { tier: 'weak', riskMultiplier: 0.5 };
+
+  const isStrong = emaGapPct != null && emaGapPct >= 3 && macdHist >= 1.5 && macdHist <= 4;
+  if (isStrong) return { tier: 'strong', riskMultiplier: 1.25 };
+
+  return { tier: 'normal', riskMultiplier: 1.0 };
+}
+
 async function executeEntry(signal) {
-  const effectiveRiskPct = Math.min(RISK_PCT, HARD_MAX_RISK_PCT);
+  const quality = classifySignalQuality(signal);
+  const effectiveRiskPct = Math.min(RISK_PCT * quality.riskMultiplier, HARD_MAX_RISK_PCT);
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
   const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
 
@@ -585,8 +604,10 @@ async function executeEntry(signal) {
     takeProfitOrderId,
     stopLossOrderId,
     openedAt: new Date().toISOString(),
-    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}${signal.vwap ? ` + فوق VWAP (${signal.vwap.toFixed(2)})` : ''}${signal.relVolume ? ` + حجم نسبي ${signal.relVolume}×` : ''}`,
+    reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}${signal.vwap ? ` + فوق VWAP (${signal.vwap.toFixed(2)})` : ''}${signal.relVolume ? ` + حجم نسبي ${signal.relVolume}×` : ''} [${quality.tier === 'strong' ? 'إشارة قوية 🟢' : quality.tier === 'weak' ? 'إشارة ضعيفة 🔴' : 'إشارة عادية 🟡'}]`,
     riskAmt,
+    signalQuality: quality.tier,
+    riskMultiplierApplied: quality.riskMultiplier,
     atrUsed,
     signalPrice: signal.entry,
   };
