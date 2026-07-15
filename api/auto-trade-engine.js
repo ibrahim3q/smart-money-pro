@@ -380,6 +380,36 @@ async function fetchAvgVolume20d(ticker) {
   }
 }
 
+// ── متوسط المدى الحقيقي (ATR-14) — مقياس تقلب كل سهم الفعلي بالدولار.
+// Polygon لا يوفّر ATR جاهزاً كمؤشر (فقط SMA/EMA/MACD/RSI)، فنحسبه يدوياً
+// من شموع يومية بالمعادلة القياسية: TR = max(H-L, |H-prevClose|,
+// |L-prevClose|)، وATR = متوسط آخر 14 قيمة TR. ──
+async function fetchATR14(ticker) {
+  try {
+    const to = new Date().toISOString().slice(0, 10);
+    const fromD = new Date();
+    fromD.setDate(fromD.getDate() - 30); // يضمن ~20 يوم تداول فعلي لحساب 14 TR
+    const from = fromD.toISOString().slice(0, 10);
+    const url = `${POLYGON_BASE}/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=30&apiKey=${POLYGON_KEY}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const bars = d?.results || [];
+    if (bars.length < 15) return null; // بيانات غير كافية لحساب موثوق
+
+    const trueRanges = [];
+    for (let i = 1; i < bars.length; i++) {
+      const high = bars[i].h, low = bars[i].l, prevClose = bars[i - 1].c;
+      const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+      trueRanges.push(tr);
+    }
+    const last14 = trueRanges.slice(-14);
+    if (last14.length === 0) return null;
+    return last14.reduce((sum, v) => sum + v, 0) / last14.length;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ═══════════════════════ البحث عن أفضل إشارة ═══════════════════════
 const ENABLE_VWAP_FILTER = (process.env.AUTO_TRADE_ENABLE_VWAP_FILTER || 'false') === 'true';
 const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'false') === 'true';
@@ -477,6 +507,13 @@ async function fetchEMA50(ticker) {
 
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
 
+// ⚠️ الهدف/الوقف المتكيّف بـATR — معطّل افتراضياً (نجرّبه بمعزل قبل
+// الالتزام، بنفس منهج VWAP/الحجم). لو فشل جلب ATR لأي سبب، نرجع تلقائياً
+// للنسبة الثابتة (fail-safe) بدل ما نمنع الصفقة بالكامل.
+const ENABLE_ATR_TARGETS = (process.env.AUTO_TRADE_ENABLE_ATR_TARGETS || 'false') === 'true';
+const ATR_STOP_MULTIPLIER = parseFloat(process.env.AUTO_TRADE_ATR_STOP_MULTIPLIER || '1.0');
+const ATR_TARGET_MULTIPLIER = parseFloat(process.env.AUTO_TRADE_ATR_TARGET_MULTIPLIER || '2.0'); // يحافظ على R:R = 2:1
+
 // ═══════════════════════ تنفيذ الدخول ═══════════════════════
 async function executeEntry(signal) {
   const effectiveRiskPct = Math.min(RISK_PCT, HARD_MAX_RISK_PCT);
@@ -498,8 +535,21 @@ async function executeEntry(signal) {
   const filledOrder = await pollOrderFillOrCancel(entryOrder.id);
   const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
 
-  const targetPrice = +(realEntryPrice * (1 + TARGET_PCT)).toFixed(2);
-  const stopPrice = +(realEntryPrice * (1 - STOP_PCT)).toFixed(2);
+  // ── حساب الهدف والوقف: من ATR الفعلي لو مفعّل ومتوفر، وإلا نسبة ثابتة ──
+  let targetPrice, stopPrice, atrUsed = null;
+  if (ENABLE_ATR_TARGETS) {
+    const atr = await fetchATR14(signal.ticker);
+    if (atr) {
+      atrUsed = atr;
+      targetPrice = +(realEntryPrice + atr * ATR_TARGET_MULTIPLIER).toFixed(2);
+      stopPrice = +(realEntryPrice - atr * ATR_STOP_MULTIPLIER).toFixed(2);
+    }
+  }
+  if (targetPrice == null) {
+    // fail-safe: نسبة ثابتة، إما لأن ATR معطّل أو فشل جلبه
+    targetPrice = +(realEntryPrice * (1 + TARGET_PCT)).toFixed(2);
+    stopPrice = +(realEntryPrice * (1 - STOP_PCT)).toFixed(2);
+  }
 
   // ── ربط الحماية بأمر OCO، ثم تحديد معرّفات الأرجل عبر استعلام مباشر
   // بالرمز (موثوق) بدل الاعتماد على حقل legs بالأمر الأب (ثبت أنه غير
@@ -537,6 +587,7 @@ async function executeEntry(signal) {
     openedAt: new Date().toISOString(),
     reason: `RSI ${signal.rsi?.toFixed(1)} + MACD hist ${signal.macdHist?.toFixed(3)}${signal.ema50 ? ` + فوق EMA50 (${signal.ema50.toFixed(2)})` : ''}${signal.vwap ? ` + فوق VWAP (${signal.vwap.toFixed(2)})` : ''}${signal.relVolume ? ` + حجم نسبي ${signal.relVolume}×` : ''}`,
     riskAmt,
+    atrUsed,
     signalPrice: signal.entry,
   };
 
