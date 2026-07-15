@@ -14,6 +14,7 @@ import {
   setCooldown,
   isCoolingDown,
   updateTickerStats,
+  getTickerStats,
   acquireExecutionLock,
   releaseExecutionLock,
   logDecision,
@@ -383,9 +384,25 @@ async function fetchAvgVolume20d(ticker) {
 const ENABLE_VWAP_FILTER = (process.env.AUTO_TRADE_ENABLE_VWAP_FILTER || 'false') === 'true';
 const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'false') === 'true';
 
+// ⚠️ فلتر الاستبعاد التلقائي بناءً على الأداء التاريخي الفعلي — أول
+// استخدام حقيقي لجدول "نقاط الثقة" اللي كنا نبنيه فقط للمراقبة. أي سهم
+// جمع 3 صفقات فأكثر ونسبة نجاحه أقل من الحد الأدنى يُستبعد تلقائياً من
+// الترشيح، بغض النظر عن قوة الإشارة اللحظية — نفس منطق "لا تشتري ضد
+// التيار" لكن مطبّق على الأداء التاريخي للسهم نفسه، مو بس اتجاهه السعري.
+const MIN_TRADES_FOR_PERFORMANCE_FILTER = parseInt(process.env.AUTO_TRADE_MIN_TRADES_FOR_FILTER || '3', 10);
+const MIN_WIN_RATE_PCT = parseFloat(process.env.AUTO_TRADE_MIN_WIN_RATE_PCT || '40');
+
 async function findBestSignal(openPositions) {
   const openTickers = new Set(openPositions.map((p) => p.ticker));
-  const candidatesRaw = WATCHLIST.filter((t) => !openTickers.has(t));
+  const candidatesAfterOpen = WATCHLIST.filter((t) => !openTickers.has(t));
+
+  // ── فلتر الأداء التاريخي: نستبعد الأسهم اللي أثبتت فشلاً متكرراً موثّقاً ──
+  const statsChecks = await Promise.all(candidatesAfterOpen.map((t) => getTickerStats(t)));
+  const candidatesRaw = candidatesAfterOpen.filter((t, i) => {
+    const stats = statsChecks[i];
+    if (!stats || stats.tradesCount < MIN_TRADES_FOR_PERFORMANCE_FILTER) return true; // بيانات غير كافية — نسمح له
+    return stats.winRate >= MIN_WIN_RATE_PCT;
+  });
 
   const cooldownChecks = await Promise.all(candidatesRaw.map((t) => isCoolingDown(t)));
   const candidates = candidatesRaw.filter((_, i) => !cooldownChecks[i]);
