@@ -133,6 +133,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'outside_entry_window', closed: runLog.closed });
     }
 
+    // ⚠️ فلتر حالة السوق العام: لا نفتح أي صفقة فردية لو السوق ككل (SPY)
+    // تحت اتجاهه العام — "لا تسبح عكس التيار" حتى لو إشارة سهم بعينه تبدو
+    // ممتازة. معطّل افتراضياً (نفس منهج الفلاتر التجريبية الأخرى). ──
+    if (ENABLE_MARKET_REGIME_FILTER) {
+      const marketHealthy = await isMarketHealthy();
+      if (!marketHealthy) {
+        await logDecision({ type: 'skip', reason: 'market_regime_unhealthy' });
+        return res.status(200).json({ status: 'market_regime_unhealthy', closed: runLog.closed });
+      }
+    }
+
     const sanityCheck = await verifyAccountSanity();
     if (!sanityCheck.ok) {
       await logDecision({ type: 'skip', reason: 'account_sanity_check_failed', details: sanityCheck });
@@ -422,7 +433,38 @@ const ENABLE_VOLUME_FILTER = (process.env.AUTO_TRADE_ENABLE_VOLUME_FILTER || 'fa
 const MIN_TRADES_FOR_PERFORMANCE_FILTER = parseInt(process.env.AUTO_TRADE_MIN_TRADES_FOR_FILTER || '3', 10);
 const MIN_WIN_RATE_PCT = parseFloat(process.env.AUTO_TRADE_MIN_WIN_RATE_PCT || '40');
 
+// ⚠️ فلتر حالة السوق العام — الفجوة الأصلية المكتشفة من أول يوم تحليل:
+// النظام كان يقيّم كل سهم بمعزل تام، بدون ما يسأل "هل السوق ككل صاعد
+// أصلاً؟". نتحقق من SPY كمقياس عام: لو السوق تحت اتجاهه العام (EMA50)،
+// نوقف كل عمليات الفتح الجديدة بغض النظر عن قوة أي إشارة فردية — مبدأ
+// "لا تسبح عكس التيار" مطبّق على مستوى السوق كامل، مو بس السهم الواحد.
+const ENABLE_MARKET_FILTER = (process.env.AUTO_TRADE_ENABLE_MARKET_FILTER || 'true') === 'true';
+
+async function isMarketConditionFavorable() {
+  if (!ENABLE_MARKET_FILTER) return { ok: true, skipped: true };
+  try {
+    const snapshot = await fetchDaySnapshot('SPY');
+    if (!snapshot?.price) return { ok: true, reason: 'data_unavailable_fail_open' }; // fail-open
+
+    const ema50 = await fetchEMA50('SPY');
+    if (ema50 == null) return { ok: true, reason: 'ema_unavailable_fail_open' };
+
+    if (snapshot.price < ema50) {
+      return { ok: false, reason: 'spy_below_ema50', spyPrice: snapshot.price, spyEma50: ema50 };
+    }
+    return { ok: true, spyPrice: snapshot.price, spyEma50: ema50 };
+  } catch (e) {
+    return { ok: true, reason: 'market_check_error_fail_open' };
+  }
+}
+
 async function findBestSignal(openPositions) {
+  // ── الفحص الأول قبل أي شي: هل السوق ككل بحالة مواتية؟ ──
+  const marketCheck = await isMarketConditionFavorable();
+  if (!marketCheck.ok) {
+    return { blocked: true, reason: 'unfavorable_market_condition', details: marketCheck };
+  }
+
   const openTickers = new Set(openPositions.map((p) => p.ticker));
   const candidatesAfterOpen = WATCHLIST.filter((t) => !openTickers.has(t));
 
@@ -441,8 +483,8 @@ async function findBestSignal(openPositions) {
   await Promise.allSettled(candidates.map(async (t) => {
     try {
       const [rsiR, macdR] = await Promise.all([
-        fetch(`${POLYGON_BASE}/v1/indicators/rsi/${t}?timespan=day&adjusted=true&window=14&series_type=close&limit=1&apiKey=${POLYGON_KEY}`).then((r) => r.json()),
-        fetch(`${POLYGON_BASE}/v1/indicators/macd/${t}?timespan=day&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&limit=1&apiKey=${POLYGON_KEY}`).then((r) => r.json()),
+        fetch(`${POLYGON_BASE}/v1/indicators/rsi/${t}?timespan=${INDICATOR_TIMESPAN}&adjusted=true&window=14&series_type=close&limit=1&apiKey=${POLYGON_KEY}`).then((r) => r.json()),
+        fetch(`${POLYGON_BASE}/v1/indicators/macd/${t}?timespan=${INDICATOR_TIMESPAN}&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&limit=1&apiKey=${POLYGON_KEY}`).then((r) => r.json()),
       ]);
       const rsi = rsiR?.results?.values?.[0]?.value;
       const macdVal = macdR?.results?.values?.[0];
@@ -506,6 +548,32 @@ async function fetchEMA50(ticker) {
 }
 
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
+
+// ⚠️ فلتر حالة السوق العام — معطّل افتراضياً (تجريبي، بنفس منهج الفلاتر
+// الأخرى). يفحص SPY كمرجع: لو تحت EMA50 الخاص فيه، السوق ككل بحالة ضعف
+// عام، فنمتنع عن فتح صفقات فردية جديدة حتى لو إشارتها ممتازة.
+const ENABLE_MARKET_REGIME_FILTER = (process.env.AUTO_TRADE_ENABLE_MARKET_REGIME_FILTER || 'false') === 'true';
+const MARKET_REGIME_TICKER = process.env.AUTO_TRADE_MARKET_REGIME_TICKER || 'SPY';
+
+async function isMarketHealthy() {
+  try {
+    const price = await fetchStockPrice(MARKET_REGIME_TICKER);
+    const ema50 = await fetchEMA50(MARKET_REGIME_TICKER);
+    if (price == null || ema50 == null) return true; // بيانات ناقصة — fail-open، لا نمنع التداول بسببها
+    return price >= ema50;
+  } catch (e) {
+    return true; // fail-open
+  }
+}
+
+// ⚠️ مؤشرات بإطار زمني أقصر (تجريبي، معطّل افتراضياً) — يعالج عدم التطابق
+// الزمني المعروف: نحسب RSI/MACD حالياً على شموع يومية لكن نتخذ قرار داخل
+// اليوم. هذا يبدّل الإطار لساعة واحدة. ⚠️ تنبيه صريح: عتبات RSI (45-65)
+// ومعايير MACD الحالية مُعايرة على بيانات يومية — لا نعرف بعد هل نفس
+// العتبات تصلح على إطار الساعة، هذا يحتاج معايرة جديدة كاملة بعد جمع
+// بيانات حقيقية بالإطار الجديد، مو افتراض جاهز من اليوم الأول.
+const ENABLE_HOURLY_INDICATORS = (process.env.AUTO_TRADE_ENABLE_HOURLY_INDICATORS || 'false') === 'true';
+const INDICATOR_TIMESPAN = ENABLE_HOURLY_INDICATORS ? 'hour' : 'day';
 
 // ⚠️ الهدف/الوقف المتكيّف بـATR — معطّل افتراضياً (نجرّبه بمعزل قبل
 // الالتزام، بنفس منهج VWAP/الحجم). لو فشل جلب ATR لأي سبب، نرجع تلقائياً
