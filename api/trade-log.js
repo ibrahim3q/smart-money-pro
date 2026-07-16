@@ -1,7 +1,9 @@
 // api/trade-log.js
 // يرجّع سجل قرارات النظام الآلي + الصفقات المفتوحة حالياً + أداء اليوم
 // تستخدمه واجهة "سجل التنفيذ الآلي" بالموقع لعرض كل شي لحظياً
-import { getRecentDecisions, getOpenPositions, getDailyPnL, isCircuitBreakerTripped, isKillSwitchActive, getAllTickerStats } from '../lib/redis.js';
+// ✨ جديد: يرجّع أيضاً نبض المحرك (lastRun) وصفقات اليوم المغلقة مع
+// الانزلاق السعري — الواجهة تقدر تعرض تحذير انقطاع النبض وجدول جودة التنفيذ
+import { getRecentDecisions, getOpenPositions, getDailyPnL, isCircuitBreakerTripped, isKillSwitchActive, getAllTickerStats, getLastRun, getDailyTrades } from '../lib/redis.js';
 
 const ALLOWED_ORIGIN = 'https://smart-money-pro-vert.vercel.app';
 
@@ -56,16 +58,23 @@ export default async function handler(req, res) {
 
   try {
     const wantRaw = req.query.raw === 'true'; // ?raw=true يرجّع كل القرارات بدون ضغط، للتشخيص التقني
-    const [decisionsRaw, openPositions, dailyPnL, breakerTripped, killSwitch, tickerStats] = await Promise.all([
+    const [decisionsRaw, openPositions, dailyPnL, breakerTripped, killSwitch, tickerStats, lastRun, dailyTrades] = await Promise.all([
       getRecentDecisions(300), // مجموعة أكبر — الضغط يفسح مجال لعرض أحداث فعلية أكثر
       getOpenPositions(),
       getDailyPnL(),
       isCircuitBreakerTripped(),
       isKillSwitchActive(),
       getAllTickerStats(),
+      getLastRun().catch(() => null),
+      getDailyTrades().catch(() => []),
     ]);
 
     const decisions = wantRaw ? decisionsRaw : collapseNoisyDecisions(decisionsRaw);
+
+    // ✨ نبض المحرك — الواجهة تعرض تحذيراً لو تجاوز 360 ثانية بساعات السوق
+    const secondsSinceLastRun = lastRun
+      ? Math.round((Date.now() - new Date(lastRun).getTime()) / 1000)
+      : null;
 
     return res.status(200).json({
       decisions,
@@ -74,6 +83,9 @@ export default async function handler(req, res) {
       breakerTripped,
       killSwitch,
       tickerStats,
+      lastRun,
+      secondsSinceLastRun,
+      dailyTrades,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
