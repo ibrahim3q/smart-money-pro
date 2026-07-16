@@ -18,7 +18,14 @@ import {
   acquireExecutionLock,
   releaseExecutionLock,
   logDecision,
+  todayKeyET,
+  setLastRun,
+  recordDailyTrade,
+  getDailyTrades,
+  tryMarkDailyReportSent,
 } from '../lib/redis.js';
+
+import { nowInET, getTodaySession } from '../lib/market-session.js';
 
 import {
   getAccount,
@@ -34,7 +41,7 @@ import {
   getOrder,
 } from '../lib/alpaca.js';
 
-import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker, notifyError } from '../lib/notify.js';
+import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker, notifyError, notifyDailyReport } from '../lib/notify.js';
 
 // ── إعدادات المخاطرة ──
 const CAPITAL = parseFloat(process.env.AUTO_TRADE_CAPITAL || '1000');
@@ -59,8 +66,10 @@ const CLOSE_ORPHAN_POSITIONS = (process.env.AUTO_TRADE_CLOSE_ORPHANS || 'false')
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
 const POLYGON_BASE = 'https://api.polygon.io';
 
-const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL' , 'AVGO', 'ORCL'];
-const US_HOLIDAYS_2026 = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-05-25', '2026-07-03', '2026-07-04', '2026-09-07', '2026-11-26', '2026-11-27', '2026-12-25'];
+const WATCHLIST = ['NVDA', 'QQQ', 'AMD', 'AAPL', 'COIN', 'TSLA', 'META', 'MSFT', 'GOOGL', 'AMZN', 'SMCI', 'PLTR', 'MSTR', 'IBIT', 'ARM', 'MRVL', 'AVGO', 'ORCL'];
+// (أُزيلت قائمة العطل الثابتة US_HOLIDAYS_2026 — أوقات الجلسة تأتي الآن
+// ديناميكياً من تقويم Alpaca عبر lib/market-session.js، شاملة أيام
+// الإغلاق المبكر التي كانت القائمة القديمة تتجاهلها كلياً)
 
 export default async function handler(req, res) {
   const authHeader = req.headers['authorization'];
@@ -69,6 +78,10 @@ export default async function handler(req, res) {
   }
 
   const runLog = { opened: null, closed: [] };
+
+  // ── ✨ نبض الحياة: يُسجَّل بكل استدعاء قبل أي منطق (حتى قبل القفل) —
+  // لو انقطع النبض بساعات السوق، /api/health والواجهة يحذّرانك فوراً ──
+  await setLastRun().catch(() => {});
 
   const lockAcquired = await acquireExecutionLock();
   if (!lockAcquired) {
@@ -83,13 +96,18 @@ export default async function handler(req, res) {
 
     const et = nowInET();
 
-    if (!isMarketOpenNow(et)) {
+    // ── ✨ جلسة السوق الديناميكية: أوقات الفتح/الإغلاق الحقيقية من تقويم
+    // Alpaca (تغطي العطل وأيام الإغلاق المبكر لأي سنة) بدل الأوقات الثابتة ──
+    const session = await getTodaySession(et);
+    if (!session || et.minutes < session.openMins || et.minutes >= session.closeMins) {
       return res.status(200).json({ status: 'skipped', reason: 'market_closed' });
     }
 
     await syncWithBroker();
 
-    const isEndOfDaySweep = et.minutes >= 955;
+    // الـsweep يبدأ قبل الإغلاق الفعلي بـ5 دقائق — سواء كان الإغلاق 16:00
+    // بيوم عادي أو 13:00 بيوم إغلاق مبكر
+    const isEndOfDaySweep = et.minutes >= session.closeMins - 5;
 
     let openPositions = await getOpenPositions();
     const stillOpen = [];
@@ -102,6 +120,11 @@ export default async function handler(req, res) {
       if (result.closed) {
         runLog.closed.push(result);
         await logDecision({ type: 'close', position: pos, result });
+        await recordDailyTrade({
+          ticker: pos.ticker, qty: pos.qty, entry: pos.entry,
+          exitPrice: result.exitPrice, pnl: result.pnl ?? 0,
+          reason: result.reason, slippage: result.slippage ?? null,
+        }).catch(() => {});
         await notifyTradeClosed(pos, result).catch(() => {});
         await setCooldown(pos.ticker).catch(() => {});
         await updateTickerStats(pos.ticker, result.pnl ?? 0).catch(() => {});
@@ -113,7 +136,13 @@ export default async function handler(req, res) {
     openPositions = stillOpen;
 
     if (isEndOfDaySweep) {
-      return res.status(200).json({ status: 'end_of_day_sweep', closed: runLog.closed });
+      // ── ✨ التقرير اليومي: بعد أن تُغلق كل المراكز فعلياً (وليس بأول
+      // دورة sweep) — الحماية الذرّية بـtryMarkDailyReportSent تضمن
+      // إرساله مرة واحدة رغم تكرار دورات الـsweep كل دقيقتين ──
+      if (stillOpen.length === 0) {
+        await sendDailyReportOnce(session).catch((e) => console.error('Daily report failed:', e.message));
+      }
+      return res.status(200).json({ status: 'end_of_day_sweep', closed: runLog.closed, earlyClose: session.isEarlyClose });
     }
 
     const dailyPnL = await getDailyPnL();
@@ -138,7 +167,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'max_daily_trades', dailyTradeCount, closed: runLog.closed });
     }
 
-    if (!isEntryWindowOpen(et)) {
+    // نافذة الدخول: بعد الافتتاح بـ15 دقيقة (تفادي تقلبات الافتتاح) وحتى
+    // قبل الإغلاق الفعلي بـ15 دقيقة — تتقلص تلقائياً بأيام الإغلاق المبكر
+    if (et.minutes < session.openMins + 15 || et.minutes >= session.closeMins - 15) {
       await logDecision({ type: 'skip', reason: 'outside_entry_window' });
       return res.status(200).json({ status: 'outside_entry_window', closed: runLog.closed });
     }
@@ -253,6 +284,14 @@ async function syncWithBroker() {
       await setCooldown(pos.ticker).catch(() => {});
       await updateTickerStats(pos.ticker, pnl).catch(() => {});
       await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
+      await recordDailyTrade({
+        ticker: pos.ticker, qty: pos.qty, entry: pos.entry, exitPrice, pnl,
+        reason: closeReason,
+        // الانزلاق للتنفيذات المتزامنة: الفرق عن السعر المخطط (هدف أو وقف)
+        slippage: closeReason === 'target_filled_synced' ? +(exitPrice - pos.target).toFixed(4)
+                : closeReason === 'stop_loss_filled_synced' ? +(exitPrice - pos.stopLoss).toFixed(4)
+                : null,
+      }).catch(() => {});
       await notifyTradeClosed(pos, { closed: true, reason: closeReason, exitPrice, pnl }).catch(() => {});
     }
 
@@ -264,36 +303,37 @@ async function syncWithBroker() {
   }
 }
 
-// ═══════════════════════ الوقت والجلسة ═══════════════════════
-// ⚠️ إصلاح: النمط القديم new Date(new Date().toLocaleString(...)) كان يعمل
-// صدفةً فقط لأن خوادم Vercel بتوقيت UTC، وينكسر بصمت على أي بيئة أخرى
-// (تطوير محلي مثلاً). الحل الموثوق: نقرأ أجزاء توقيت نيويورك مباشرة عبر
-// Intl.DateTimeFormat بدون أي تحويل عكسي عبر Date.
-function nowInET() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(now);
-  const get = (t) => parts.find((p) => p.type === t)?.value;
-  const hour = parseInt(get('hour'), 10) % 24; // بعض البيئات ترجع '24' لمنتصف الليل
-  const dayName = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(now);
-  return {
-    dateStr: `${get('year')}-${get('month')}-${get('day')}`,
-    minutes: hour * 60 + parseInt(get('minute'), 10),
-    day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayName),
-  };
-}
+// ═══════════════════════ ✨ التقرير اليومي ═══════════════════════
+// يُستدعى من دورة الـsweep بعد أن تُغلق كل المراكز. الحجز الذرّي
+// (tryMarkDailyReportSent) يضمن الإرسال مرة واحدة فقط باليوم.
+async function sendDailyReportOnce(session) {
+  const trades = await getDailyTrades();
+  if (trades.length === 0) return; // يوم بلا صفقات — لا نرسل ضجيجاً
 
-function isMarketOpenNow(et) {
-  if (et.day === 0 || et.day === 6) return false;
-  if (US_HOLIDAYS_2026.includes(et.dateStr)) return false;
-  return et.minutes >= 570 && et.minutes < 960;
-}
+  const isFirst = await tryMarkDailyReportSent();
+  if (!isFirst) return; // أُرسل مسبقاً بدورة sweep سابقة
 
-function isEntryWindowOpen(et) {
-  return et.minutes >= 585 && et.minutes < 945;
+  const totalPnL = await getDailyPnL();
+  const wins = trades.filter((t) => (t.pnl ?? 0) >= 0).length;
+  const losses = trades.length - wins;
+  const sorted = [...trades].sort((a, b) => (b.pnl ?? 0) - (a.pnl ?? 0));
+  const withSlippage = trades.filter((t) => t.slippage != null);
+  const avgSlippage = withSlippage.length
+    ? withSlippage.reduce((s, t) => s + t.slippage, 0) / withSlippage.length
+    : null;
+
+  await notifyDailyReport({
+    date: todayKeyET(),
+    totalPnL,
+    tradesCount: trades.length,
+    wins,
+    losses,
+    winRatePct: (wins / trades.length) * 100,
+    best: sorted[0] || null,
+    worst: sorted[sorted.length - 1] || null,
+    avgSlippage,
+    earlyClose: session?.isEarlyClose || false,
+  });
 }
 
 // ═══════════════════════ صمّام أمان ═══════════════════════
@@ -323,17 +363,21 @@ async function evaluatePosition(pos) {
     if (pos.takeProfitOrderId) {
       const tp = await getOrder(pos.takeProfitOrderId).catch(() => null);
       if (tp?.status === 'filled') {
-        const pnl = (parseFloat(tp.filled_avg_price) - pos.entry) * pos.qty;
+        const exitPrice = parseFloat(tp.filled_avg_price);
+        const pnl = (exitPrice - pos.entry) * pos.qty;
         await addToDailyPnL(pnl);
-        return { closed: true, reason: 'target_filled', exitPrice: parseFloat(tp.filled_avg_price), pnl };
+        // ✨ الانزلاق = الفرق عن السعر المخطط ($/سهم — الموجب أفضل بالبيع)
+        return { closed: true, reason: 'target_filled', exitPrice, pnl, slippage: +(exitPrice - pos.target).toFixed(4) };
       }
     }
     if (pos.stopLossOrderId) {
       const sl = await getOrder(pos.stopLossOrderId).catch(() => null);
       if (sl?.status === 'filled') {
-        const pnl = (parseFloat(sl.filled_avg_price) - pos.entry) * pos.qty;
+        const exitPrice = parseFloat(sl.filled_avg_price);
+        const pnl = (exitPrice - pos.entry) * pos.qty;
         await addToDailyPnL(pnl);
-        return { closed: true, reason: 'stop_loss_filled', exitPrice: parseFloat(sl.filled_avg_price), pnl };
+        // انزلاق الوقف عادةً سالب (التنفيذ تحت سعر الوقف) — أهم رقم تراقبه
+        return { closed: true, reason: 'stop_loss_filled', exitPrice, pnl, slippage: +(exitPrice - pos.stopLoss).toFixed(4) };
       }
     }
 
@@ -353,6 +397,8 @@ async function evaluatePosition(pos) {
         closed: true,
         reason: price >= pos.target ? 'target_hit_direct_check' : 'stop_hit_direct_check',
         exitPrice, pnl,
+        // ✨ الانزلاق = التنفيذ الفعلي − السعر لحظة اتخاذ قرار الإغلاق
+        slippage: fillPrice != null ? +(fillPrice - price).toFixed(4) : null,
       };
     }
 
@@ -372,7 +418,7 @@ async function evaluatePosition(pos) {
         const exitPrice = fillPrice ?? parseFloat(closeOrder.filled_avg_price || price);
         const pnl = (exitPrice - pos.entry) * pos.qty;
         await addToDailyPnL(pnl);
-        return { closed: true, reason: 'profit_lock_trailing', exitPrice, pnl };
+        return { closed: true, reason: 'profit_lock_trailing', exitPrice, pnl, slippage: fillPrice != null ? +(fillPrice - price).toFixed(4) : null };
       }
     }
 
@@ -392,7 +438,7 @@ async function forceCloseEndOfDay(pos) {
     const exitPrice = fillPrice ?? parseFloat(closeOrder.filled_avg_price || price || pos.entry);
     const pnl = (exitPrice - pos.entry) * pos.qty;
     await addToDailyPnL(pnl);
-    return { closed: true, reason: 'end_of_day_forced_close', exitPrice, pnl };
+    return { closed: true, reason: 'end_of_day_forced_close', exitPrice, pnl, slippage: fillPrice != null && price != null ? +(fillPrice - price).toFixed(4) : null };
   } catch (err) {
     return { closed: false, reason: 'force_close_error', error: err.message };
   }
@@ -668,7 +714,13 @@ async function executeEntry(signal) {
   }
 
   const ceilingPrice = +(signal.entry * (1 + MAX_ENTRY_GAP_PCT / 100)).toFixed(2);
-  const entryOrder = await openEquityLimitOrder({ symbol: signal.ticker, qty: shares, limitPrice: ceilingPrice });
+
+  // ── ✨ معرّف أمر ثابت (Idempotency): لو الطلب وصل لـAlpaca لكن الرد ضاع
+  // بانقطاع شبكة وأُعيدت المحاولة، المعرّف المكرر يُرفض بدل فتح مركز مضاعف ──
+  const dailyCount = await getDailyTradeCount();
+  const clientOrderId = `bot-${signal.ticker}-${todayKeyET()}-${dailyCount + 1}`;
+
+  const entryOrder = await openEquityLimitOrder({ symbol: signal.ticker, qty: shares, limitPrice: ceilingPrice, clientOrderId });
 
   // ── انتظار التنفيذ الكامل — مع التقاط أخطر حالة: التنفيذ الجزئي ──
   // ⚠️ إصلاح: لو الأمر الحدّي امتلأ جزئياً ثم أُلغي بعد المهلة، كنا نملك
@@ -693,6 +745,7 @@ async function executeEntry(signal) {
           const pnl = (liqPrice - partialEntry) * partialQty;
           await addToDailyPnL(pnl).catch(() => {});
           await logDecision({ type: 'close', reason: 'partial_fill_liquidated', ticker: signal.ticker, qty: partialQty, entry: partialEntry, exitPrice: liqPrice, pnl }).catch(() => {});
+          await recordDailyTrade({ ticker: signal.ticker, qty: partialQty, entry: partialEntry, exitPrice: liqPrice, pnl, reason: 'partial_fill_liquidated', slippage: null }).catch(() => {});
         }
       }
       await notifyError(`تنفيذ جزئي لـ${signal.ticker} (${partialQty} من ${shares} سهم) — تمت تصفيته فوراً`).catch(() => {});
@@ -754,6 +807,7 @@ async function executeEntry(signal) {
         const pnl = (liqPrice - realEntryPrice) * shares;
         await addToDailyPnL(pnl).catch(() => {});
         await logDecision({ type: 'close', reason: 'oco_failed_liquidated', ticker: signal.ticker, qty: shares, entry: realEntryPrice, exitPrice: liqPrice, pnl }).catch(() => {});
+        await recordDailyTrade({ ticker: signal.ticker, qty: shares, entry: realEntryPrice, exitPrice: liqPrice, pnl, reason: 'oco_failed_liquidated', slippage: null }).catch(() => {});
       }
       await notifyError(`فشل ربط الحماية (OCO) لـ${signal.ticker} — تمت تصفية المركز فوراً بدل تركه عارياً`).catch(() => {});
     } else {
