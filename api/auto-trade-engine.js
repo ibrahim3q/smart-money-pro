@@ -26,6 +26,7 @@ import {
   openEquityMarketOrder,
   openEquityLimitOrder,
   pollOrderFillOrCancel,
+  pollOrderFillPrice,
   placeOCOExit,
   closeEquityPositionMarket,
   cancelAllOrdersForSymbol,
@@ -33,7 +34,7 @@ import {
   getOrder,
 } from '../lib/alpaca.js';
 
-import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker } from '../lib/notify.js';
+import { notifyTradeOpened, notifyTradeClosed, notifyCircuitBreaker, notifyError } from '../lib/notify.js';
 
 // ── إعدادات المخاطرة ──
 const CAPITAL = parseFloat(process.env.AUTO_TRADE_CAPITAL || '1000');
@@ -44,6 +45,16 @@ const MAX_DAILY_TRADES = parseInt(process.env.AUTO_TRADE_MAX_DAILY_TRADES || '5'
 const TARGET_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_TARGET_PCT || '1.5') / 100;
 const STOP_PCT = parseFloat(process.env.AUTO_TRADE_STOCK_STOP_PCT || '0.75') / 100;
 const HARD_MAX_RISK_PCT = 5;
+
+// ── سقف القيمة الاسمية للمركز الواحد كنسبة من رأس المال ──
+// بدونه: مخاطرة 2% مع وقف 0.75% تعني مركزاً اسمياً ≈ 2.67× رأس المال!
+// الافتراضي 100% يعني المركز الواحد لا يتجاوز كامل رأس المال المخصص.
+const MAX_NOTIONAL_PCT = parseFloat(process.env.AUTO_TRADE_MAX_NOTIONAL_PCT || '100');
+
+// ── التعامل مع مراكز الوسيط المجهولة (غير المسجّلة محلياً) ──
+// false (الافتراضي): إشعار وتسجيل فقط — آمن لو تتداول يدوياً بنفس الحساب.
+// true: تصفية فورية بالسوق — فعّلها فقط لو الحساب مخصص للبوت حصرياً.
+const CLOSE_ORPHAN_POSITIONS = (process.env.AUTO_TRADE_CLOSE_ORPHANS || 'false') === 'true';
 
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
 const POLYGON_BASE = 'https://api.polygon.io';
@@ -70,16 +81,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'halted', reason: 'kill_switch_active' });
     }
 
-    const nowET = nowInET();
+    const et = nowInET();
 
-    if (!isMarketOpenNow(nowET)) {
+    if (!isMarketOpenNow(et)) {
       return res.status(200).json({ status: 'skipped', reason: 'market_closed' });
     }
 
     await syncWithBroker();
 
-    const minsNow = nowET.getHours() * 60 + nowET.getMinutes();
-    const isEndOfDaySweep = minsNow >= 955;
+    const isEndOfDaySweep = et.minutes >= 955;
 
     let openPositions = await getOpenPositions();
     const stillOpen = [];
@@ -128,21 +138,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'max_daily_trades', dailyTradeCount, closed: runLog.closed });
     }
 
-    if (!isEntryWindowOpen(nowET)) {
+    if (!isEntryWindowOpen(et)) {
       await logDecision({ type: 'skip', reason: 'outside_entry_window' });
       return res.status(200).json({ status: 'outside_entry_window', closed: runLog.closed });
     }
 
-    // ⚠️ فلتر حالة السوق العام: لا نفتح أي صفقة فردية لو السوق ككل (SPY)
-    // تحت اتجاهه العام — "لا تسبح عكس التيار" حتى لو إشارة سهم بعينه تبدو
-    // ممتازة. معطّل افتراضياً (نفس منهج الفلاتر التجريبية الأخرى). ──
-    if (ENABLE_MARKET_REGIME_FILTER) {
-      const marketHealthy = await isMarketHealthy();
-      if (!marketHealthy) {
-        await logDecision({ type: 'skip', reason: 'market_regime_unhealthy' });
-        return res.status(200).json({ status: 'market_regime_unhealthy', closed: runLog.closed });
-      }
-    }
+    // (أُزيل فلتر ENABLE_MARKET_REGIME_FILTER المكرر — فلتر السوق العام
+    // موجود بالفعل داخل findBestSignal عبر isMarketConditionFavorable)
 
     const sanityCheck = await verifyAccountSanity();
     if (!sanityCheck.ok) {
@@ -151,6 +153,14 @@ export default async function handler(req, res) {
     }
 
     const signal = await findBestSignal(openPositions);
+
+    // ⚠️ إصلاح حرج: findBestSignal ترجع { blocked: true } عندما يكون السوق
+    // غير مواتٍ — وهذا كائن truthy كان يمرّ من فحص !signal القديم ويصل
+    // لـ executeEntry بـ ticker undefined فينفجر بخطأ entry_failed كل دورة.
+    if (signal?.blocked) {
+      await logDecision({ type: 'skip', reason: signal.reason, details: signal.details });
+      return res.status(200).json({ status: signal.reason, details: signal.details, closed: runLog.closed });
+    }
     if (!signal) {
       await logDecision({ type: 'no_signal' });
       return res.status(200).json({ status: 'no_signal', closed: runLog.closed });
@@ -184,10 +194,34 @@ export default async function handler(req, res) {
 async function syncWithBroker() {
   try {
     const localPositions = await getOpenPositions();
-    if (localPositions.length === 0) return;
 
     const brokerPositions = await getPositions();
     const brokerSymbols = new Set((brokerPositions || []).map((p) => p.symbol));
+    const localSymbols = new Set(localPositions.map((p) => p.ticker));
+
+    // ── مزامنة عكسية: مراكز موجودة عند الوسيط لكنها غير مسجّلة محلياً ──
+    // مصدرها المحتمل: تنفيذ جزئي لم يُلتقط، أو انقطاع بين الشراء والتسجيل.
+    // هذه مراكز بلا هدف ولا وقف ولا مراقبة — أخطر حالة بالنظام كله.
+    for (const bp of brokerPositions || []) {
+      if (localSymbols.has(bp.symbol)) continue;
+      await logDecision({
+        type: 'orphan_position_detected',
+        symbol: bp.symbol,
+        qty: bp.qty,
+        avgEntry: bp.avg_entry_price,
+        action: CLOSE_ORPHAN_POSITIONS ? 'liquidate' : 'notify_only',
+      }).catch(() => {});
+      if (CLOSE_ORPHAN_POSITIONS) {
+        await cancelAllOrdersForSymbol(bp.symbol).catch(() => {});
+        await closeEquityPositionMarket(bp.symbol, bp.qty).catch((e) =>
+          console.error(`Orphan liquidation failed for ${bp.symbol}:`, e.message));
+        await notifyError(`مركز مجهول ${bp.symbol} (${bp.qty} سهم) غير مسجّل بالنظام — تمت تصفيته فوراً`).catch(() => {});
+      } else {
+        await notifyError(`⚠️ مركز مجهول عند الوسيط: ${bp.symbol} (${bp.qty} سهم) — غير مُدار آلياً وبلا حماية! راجعه يدوياً أو فعّل AUTO_TRADE_CLOSE_ORPHANS`).catch(() => {});
+      }
+    }
+
+    if (localPositions.length === 0) return;
 
     const stillOpen = [];
     for (const pos of localPositions) {
@@ -219,6 +253,7 @@ async function syncWithBroker() {
       await setCooldown(pos.ticker).catch(() => {});
       await updateTickerStats(pos.ticker, pnl).catch(() => {});
       await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
+      await notifyTradeClosed(pos, { closed: true, reason: closeReason, exitPrice, pnl }).catch(() => {});
     }
 
     if (stillOpen.length !== localPositions.length) {
@@ -230,21 +265,35 @@ async function syncWithBroker() {
 }
 
 // ═══════════════════════ الوقت والجلسة ═══════════════════════
+// ⚠️ إصلاح: النمط القديم new Date(new Date().toLocaleString(...)) كان يعمل
+// صدفةً فقط لأن خوادم Vercel بتوقيت UTC، وينكسر بصمت على أي بيئة أخرى
+// (تطوير محلي مثلاً). الحل الموثوق: نقرأ أجزاء توقيت نيويورك مباشرة عبر
+// Intl.DateTimeFormat بدون أي تحويل عكسي عبر Date.
 function nowInET() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-}
-function isMarketOpenNow(ny) {
-  const day = ny.getDay();
-  if (day === 0 || day === 6) return false;
-  const dateStr = ny.toISOString().slice(0, 10);
-  if (US_HOLIDAYS_2026.includes(dateStr)) return false;
-  const mins = ny.getHours() * 60 + ny.getMinutes();
-  return mins >= 570 && mins < 960;
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(now);
+  const get = (t) => parts.find((p) => p.type === t)?.value;
+  const hour = parseInt(get('hour'), 10) % 24; // بعض البيئات ترجع '24' لمنتصف الليل
+  const dayName = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(now);
+  return {
+    dateStr: `${get('year')}-${get('month')}-${get('day')}`,
+    minutes: hour * 60 + parseInt(get('minute'), 10),
+    day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayName),
+  };
 }
 
-function isEntryWindowOpen(ny) {
-  const mins = ny.getHours() * 60 + ny.getMinutes();
-  return mins >= 585 && mins < 945;
+function isMarketOpenNow(et) {
+  if (et.day === 0 || et.day === 6) return false;
+  if (US_HOLIDAYS_2026.includes(et.dateStr)) return false;
+  return et.minutes >= 570 && et.minutes < 960;
+}
+
+function isEntryWindowOpen(et) {
+  return et.minutes >= 585 && et.minutes < 945;
 }
 
 // ═══════════════════════ صمّام أمان ═══════════════════════
@@ -294,7 +343,10 @@ async function evaluatePosition(pos) {
     if (price >= pos.target || price <= pos.stopLoss) {
       await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
       const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
-      const exitPrice = parseFloat(closeOrder.filled_avg_price || price);
+      // ⚠️ إصلاح: أمر السوق يرجع فوراً بحالة "new" وبدون سعر تنفيذ — ننتظر
+      // التنفيذ الفعلي حتى يُحتسب PnL من السعر الحقيقي شاملاً الانزلاق السعري
+      const fillPrice = await pollOrderFillPrice(closeOrder.id).catch(() => null);
+      const exitPrice = fillPrice ?? parseFloat(closeOrder.filled_avg_price || price);
       const pnl = (exitPrice - pos.entry) * pos.qty;
       await addToDailyPnL(pnl);
       return {
@@ -316,7 +368,8 @@ async function evaluatePosition(pos) {
       if (pullbackRatio >= TRAILING_LOCK_PULLBACK_PCT) {
         await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
         const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
-        const exitPrice = parseFloat(closeOrder.filled_avg_price || price);
+        const fillPrice = await pollOrderFillPrice(closeOrder.id).catch(() => null);
+        const exitPrice = fillPrice ?? parseFloat(closeOrder.filled_avg_price || price);
         const pnl = (exitPrice - pos.entry) * pos.qty;
         await addToDailyPnL(pnl);
         return { closed: true, reason: 'profit_lock_trailing', exitPrice, pnl };
@@ -335,7 +388,8 @@ async function forceCloseEndOfDay(pos) {
     await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
     const price = await fetchStockPrice(pos.ticker);
     const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
-    const exitPrice = parseFloat(closeOrder.filled_avg_price || price || pos.entry);
+    const fillPrice = await pollOrderFillPrice(closeOrder.id).catch(() => null);
+    const exitPrice = fillPrice ?? parseFloat(closeOrder.filled_avg_price || price || pos.entry);
     const pnl = (exitPrice - pos.entry) * pos.qty;
     await addToDailyPnL(pnl);
     return { closed: true, reason: 'end_of_day_forced_close', exitPrice, pnl };
@@ -549,22 +603,8 @@ async function fetchEMA50(ticker) {
 
 const MAX_ENTRY_GAP_PCT = parseFloat(process.env.AUTO_TRADE_MAX_ENTRY_GAP_PCT || '0.7');
 
-// ⚠️ فلتر حالة السوق العام — معطّل افتراضياً (تجريبي، بنفس منهج الفلاتر
-// الأخرى). يفحص SPY كمرجع: لو تحت EMA50 الخاص فيه، السوق ككل بحالة ضعف
-// عام، فنمتنع عن فتح صفقات فردية جديدة حتى لو إشارتها ممتازة.
-const ENABLE_MARKET_REGIME_FILTER = (process.env.AUTO_TRADE_ENABLE_MARKET_REGIME_FILTER || 'false') === 'true';
-const MARKET_REGIME_TICKER = process.env.AUTO_TRADE_MARKET_REGIME_TICKER || 'SPY';
-
-async function isMarketHealthy() {
-  try {
-    const price = await fetchStockPrice(MARKET_REGIME_TICKER);
-    const ema50 = await fetchEMA50(MARKET_REGIME_TICKER);
-    if (price == null || ema50 == null) return true; // بيانات ناقصة — fail-open، لا نمنع التداول بسببها
-    return price >= ema50;
-  } catch (e) {
-    return true; // fail-open
-  }
-}
+// (أُزيلت هنا نسخة مكررة من فلتر حالة السوق — النسخة الفعالة الوحيدة الآن
+// هي isMarketConditionFavorable المستدعاة داخل findBestSignal)
 
 // ⚠️ مؤشرات بإطار زمني أقصر (تجريبي، معطّل افتراضياً) — يعالج عدم التطابق
 // الزمني المعروف: نحسب RSI/MACD حالياً على شموع يومية لكن نتخذ قرار داخل
@@ -605,7 +645,18 @@ async function executeEntry(signal) {
   const quality = classifySignalQuality(signal);
   const effectiveRiskPct = Math.min(RISK_PCT * quality.riskMultiplier, HARD_MAX_RISK_PCT);
   const riskAmt = CAPITAL * effectiveRiskPct / 100;
-  const shares = Math.max(1, Math.floor(riskAmt / (signal.entry * STOP_PCT)));
+
+  // ── تحديد الكمية: بميزانية المخاطرة، مسقوفة بالقيمة الاسمية القصوى ──
+  // ⚠️ إصلاح مزدوج: (١) الحساب القديم riskAmt/(entry*STOP_PCT) كان ينتج
+  // مركزاً اسمياً ≈ 2.67× رأس المال بالإعدادات الافتراضية. (٢) Math.max(1,...)
+  // القديم كان يفرض سهماً واحداً حتى لو سعره وحده يكسر ميزانية المخاطرة.
+  const sharesByRisk = Math.floor(riskAmt / (signal.entry * STOP_PCT));
+  const maxNotional = CAPITAL * MAX_NOTIONAL_PCT / 100;
+  const sharesByNotional = Math.floor(maxNotional / signal.entry);
+  const shares = Math.min(sharesByRisk, sharesByNotional);
+  if (shares < 1) {
+    throw new Error(`position_too_expensive: ${signal.ticker} @ $${signal.entry} يتجاوز سقف القيمة الاسمية ($${maxNotional.toFixed(0)}) أو ميزانية المخاطرة`);
+  }
 
   const freshPrice = await fetchStockPrice(signal.ticker);
   if (freshPrice) {
@@ -619,7 +670,35 @@ async function executeEntry(signal) {
   const ceilingPrice = +(signal.entry * (1 + MAX_ENTRY_GAP_PCT / 100)).toFixed(2);
   const entryOrder = await openEquityLimitOrder({ symbol: signal.ticker, qty: shares, limitPrice: ceilingPrice });
 
-  const filledOrder = await pollOrderFillOrCancel(entryOrder.id);
+  // ── انتظار التنفيذ الكامل — مع التقاط أخطر حالة: التنفيذ الجزئي ──
+  // ⚠️ إصلاح: لو الأمر الحدّي امتلأ جزئياً ثم أُلغي بعد المهلة، كنا نملك
+  // أسهماً حقيقية بلا سجل محلي وبلا حماية OCO (مركز يتيم). الآن نفحص
+  // الكمية المنفّذة بعد أي فشل ونصفّيها فوراً بالسوق.
+  let filledOrder;
+  try {
+    filledOrder = await pollOrderFillOrCancel(entryOrder.id);
+  } catch (pollErr) {
+    const canceledOrder = await getOrder(entryOrder.id).catch(() => null);
+    const partialQty = canceledOrder ? parseFloat(canceledOrder.filled_qty || '0') : 0;
+    if (partialQty > 0) {
+      console.error(`Partial fill detected on ${signal.ticker} (${partialQty}/${shares}) — liquidating immediately`);
+      const liqOrder = await closeEquityPositionMarket(signal.ticker, partialQty).catch((e) => {
+        console.error('Partial-fill liquidation failed:', e.message);
+        return null;
+      });
+      if (liqOrder) {
+        const liqPrice = await pollOrderFillPrice(liqOrder.id).catch(() => null);
+        const partialEntry = parseFloat(canceledOrder.filled_avg_price || signal.entry);
+        if (liqPrice != null) {
+          const pnl = (liqPrice - partialEntry) * partialQty;
+          await addToDailyPnL(pnl).catch(() => {});
+          await logDecision({ type: 'close', reason: 'partial_fill_liquidated', ticker: signal.ticker, qty: partialQty, entry: partialEntry, exitPrice: liqPrice, pnl }).catch(() => {});
+        }
+      }
+      await notifyError(`تنفيذ جزئي لـ${signal.ticker} (${partialQty} من ${shares} سهم) — تمت تصفيته فوراً`).catch(() => {});
+    }
+    throw pollErr;
+  }
   const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
 
   // ── حساب الهدف والوقف: من ATR الفعلي لو مفعّل ومتوفر، وإلا نسبة ثابتة ──
@@ -641,24 +720,56 @@ async function executeEntry(signal) {
   // ── ربط الحماية بأمر OCO، ثم تحديد معرّفات الأرجل عبر استعلام مباشر
   // بالرمز (موثوق) بدل الاعتماد على حقل legs بالأمر الأب (ثبت أنه غير
   // موثوق دائماً بمنصة Alpaca لأوامر OCO — موثّق بشكاوى مجتمعية) ──
+  // ⚠️ إصلاح: الفشل بربط الحماية كان يُسجَّل بـconsole.error فقط ويُترك
+  // المركز عارياً بلا هدف ولا وقف. الآن: محاولتان، ولو فشلتا معاً نصفّي
+  // المركز فوراً بالسوق — مركز بلا حماية أخطر من عدم دخول الصفقة أصلاً.
   let takeProfitOrderId = null;
   let stopLossOrderId = null;
-  try {
-    await placeOCOExit({
-      symbol: signal.ticker,
-      qty: shares,
-      takeProfitPrice: targetPrice,
-      stopLossPrice: stopPrice,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const legsResult = await fetchRecentSellOrdersForSymbol(signal.ticker, shares);
-    takeProfitOrderId = legsResult.takeProfitOrderId;
-    stopLossOrderId = legsResult.stopLossOrderId;
-    if (!takeProfitOrderId || !stopLossOrderId) {
-      console.error('OCO legs incomplete after direct query:', JSON.stringify(legsResult.raw));
+  let ocoPlaced = false;
+  let lastOcoError = null;
+  for (let attempt = 1; attempt <= 2 && !ocoPlaced; attempt++) {
+    try {
+      await placeOCOExit({
+        symbol: signal.ticker,
+        qty: shares,
+        takeProfitPrice: targetPrice,
+        stopLossPrice: stopPrice,
+      });
+      ocoPlaced = true;
+    } catch (e) {
+      lastOcoError = e;
+      console.error(`OCO placement attempt ${attempt} failed:`, e.message);
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-  } catch (e) {
-    console.error('OCO exit placement failed:', e.message);
+  }
+
+  if (!ocoPlaced) {
+    const liqOrder = await closeEquityPositionMarket(signal.ticker, shares).catch((e) => {
+      console.error('Naked-position liquidation failed:', e.message);
+      return null;
+    });
+    if (liqOrder) {
+      const liqPrice = await pollOrderFillPrice(liqOrder.id).catch(() => null);
+      if (liqPrice != null) {
+        const pnl = (liqPrice - realEntryPrice) * shares;
+        await addToDailyPnL(pnl).catch(() => {});
+        await logDecision({ type: 'close', reason: 'oco_failed_liquidated', ticker: signal.ticker, qty: shares, entry: realEntryPrice, exitPrice: liqPrice, pnl }).catch(() => {});
+      }
+      await notifyError(`فشل ربط الحماية (OCO) لـ${signal.ticker} — تمت تصفية المركز فوراً بدل تركه عارياً`).catch(() => {});
+    } else {
+      // أسوأ سيناريو: مركز عارٍ لم نستطع تصفيته — إشعار عاجل، والمزامنة
+      // العكسية بالدورة القادمة ستلتقطه كمركز يتيم وتنبّه مجدداً
+      await notifyError(`🚨 عاجل: ${signal.ticker} مركز بلا حماية وفشلت تصفيته! تدخّل يدوياً الآن (${shares} سهم @ $${realEntryPrice})`).catch(() => {});
+    }
+    throw new Error(`oco_protection_failed: ${lastOcoError?.message || 'unknown'}`);
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  const legsResult = await fetchRecentSellOrdersForSymbol(signal.ticker, shares);
+  takeProfitOrderId = legsResult.takeProfitOrderId;
+  stopLossOrderId = legsResult.stopLossOrderId;
+  if (!takeProfitOrderId || !stopLossOrderId) {
+    console.error('OCO legs incomplete after direct query:', JSON.stringify(legsResult.raw));
   }
 
   const position = {
