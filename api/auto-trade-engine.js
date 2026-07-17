@@ -13,6 +13,8 @@ import {
   incrementDailyTradeCount,
   setCooldown,
   isCoolingDown,
+  setDayBlock,
+  isDayBlocked,
   updateTickerStats,
   getTickerStats,
   acquireExecutionLock,
@@ -62,6 +64,20 @@ const MAX_NOTIONAL_PCT = parseFloat(process.env.AUTO_TRADE_MAX_NOTIONAL_PCT || '
 // false (الافتراضي): إشعار وتسجيل فقط — آمن لو تتداول يدوياً بنفس الحساب.
 // true: تصفية فورية بالسوق — فعّلها فقط لو الحساب مخصص للبوت حصرياً.
 const CLOSE_ORPHAN_POSITIONS = (process.env.AUTO_TRADE_CLOSE_ORPHANS || 'false') === 'true';
+
+// ── ✨ حظر إعادة الدخول بعد الخسارة (افتراضياً مفعّل) ──
+// سهم أُغلق بخسارة (وقف/تصفية أرضية) لا يُعاد ترشيحه لبقية اليوم — فشل
+// إشارته مرة اليوم يعني أن نمطه الحالي غير مواتٍ، والتهدئة القصيرة وحدها
+// أثبتت أنها تسمح بتكرار نفس الخسارة. الخروج بربح يبقى بالتهدئة القصيرة.
+const BLOCK_REENTRY_AFTER_LOSS = (process.env.AUTO_TRADE_BLOCK_REENTRY_AFTER_LOSS || 'true') === 'true';
+
+// إغلاق نهاية اليوم لا يُعد فشل إشارة — لا يستدعي حظراً
+async function applyLossDayBlock(ticker, pnl, reason) {
+  if (!BLOCK_REENTRY_AFTER_LOSS) return;
+  if (pnl >= 0) return;
+  if (reason === 'end_of_day_forced_close') return;
+  await setDayBlock(ticker).catch(() => {});
+}
 
 const POLYGON_KEY = process.env.POLYGON_API_KEY;
 const POLYGON_BASE = 'https://api.polygon.io';
@@ -127,6 +143,7 @@ export default async function handler(req, res) {
         }).catch(() => {});
         await notifyTradeClosed(pos, result).catch(() => {});
         await setCooldown(pos.ticker).catch(() => {});
+        await applyLossDayBlock(pos.ticker, result.pnl ?? 0, result.reason);
         await updateTickerStats(pos.ticker, result.pnl ?? 0).catch(() => {});
       } else {
         stillOpen.push(result.updatedPos || pos);
@@ -201,7 +218,13 @@ export default async function handler(req, res) {
     try {
       opened = await executeEntry(signal);
     } catch (execErr) {
-      await setCooldown(signal.ticker, 120).catch(() => {});
+      // ⚠️ إصلاح: فشل الأرضية السعرية يضبط تهدئة 30 دقيقة داخل executeEntry
+      // قبل رمي الخطأ — التهدئة القصيرة هنا كانت تكتب فوقها وتسمح بإعادة
+      // مطاردة السكين الساقطة بعد دقيقتين فقط (حصل فعلياً مع MSFT مرتين
+      // خلال 4 دقائق). الآن لا نلمس التهدئة لو الخطأ من نوع الأرضية.
+      if (!execErr.message?.startsWith('entry_below_price_floor')) {
+        await setCooldown(signal.ticker, 120).catch(() => {});
+      }
       await logDecision({ type: 'error', message: execErr.message, ticker: signal.ticker }).catch(() => {});
       return res.status(200).json({ status: 'entry_failed', ticker: signal.ticker, error: execErr.message, closed: runLog.closed });
     }
@@ -282,6 +305,7 @@ async function syncWithBroker() {
       const pnl = (exitPrice - pos.entry) * pos.qty;
       await addToDailyPnL(pnl);
       await setCooldown(pos.ticker).catch(() => {});
+      await applyLossDayBlock(pos.ticker, pnl, closeReason);
       await updateTickerStats(pos.ticker, pnl).catch(() => {});
       await logDecision({ type: 'close', position: pos, result: { closed: true, reason: closeReason, exitPrice, pnl, via: 'broker_sync' } });
       await recordDailyTrade({
@@ -384,7 +408,18 @@ async function evaluatePosition(pos) {
     const price = await fetchStockPrice(pos.ticker);
     if (price == null) return { closed: false, reason: 'no_quote', updatedPos: pos };
 
-    if (price >= pos.target || price <= pos.stopLoss) {
+    // ⚠️ إصلاح "الوقف الكاذب": الفحص المباشر كان يغلق فوراً عند أي قراءة
+    // تتجاوز الهدف/الوقف — لكن سعر Polygon قد يكون متأخراً أو شاذاً (حصل
+    // فعلياً: صفقة AMZN أُغلقت "بضرب الوقف" ثم نُفّذ البيع أعلى من الوقف
+    // بـ$2 — أي أن المركز كان سليماً). الحماية الأساسية هي أوامر OCO عند
+    // الوسيط وتنفذ بالسعر الحقيقي لحظياً؛ الفحص المباشر مجرد شبكة أمان
+    // خلفية، فنشترط أن يتجاوز الكسر هامشاً واضحاً قبل التدخل — الكسور
+    // الحقيقية الصغيرة سيلتقطها OCO بكل الأحوال.
+    const DIRECT_CHECK_BUFFER = parseFloat(process.env.AUTO_TRADE_DIRECT_CHECK_BUFFER_PCT || '0.3') / 100;
+    const targetTrigger = pos.target * (1 + DIRECT_CHECK_BUFFER);
+    const stopTrigger = pos.stopLoss * (1 - DIRECT_CHECK_BUFFER);
+
+    if (price >= targetTrigger || price <= stopTrigger) {
       await cancelAllOrdersForSymbol(pos.ticker).catch(() => {});
       const closeOrder = await closeEquityPositionMarket(pos.ticker, pos.qty);
       // ⚠️ إصلاح: أمر السوق يرجع فوراً بحالة "new" وبدون سعر تنفيذ — ننتظر
@@ -577,7 +612,9 @@ async function findBestSignal(openPositions) {
   });
 
   const cooldownChecks = await Promise.all(candidatesRaw.map((t) => isCoolingDown(t)));
-  const candidates = candidatesRaw.filter((_, i) => !cooldownChecks[i]);
+  // ✨ الحظر اليومي: استبعاد أي سهم أُغلق بخسارة اليوم من الترشيح كلياً
+  const dayBlockChecks = await Promise.all(candidatesRaw.map((t) => isDayBlocked(t).catch(() => false)));
+  const candidates = candidatesRaw.filter((_, i) => !cooldownChecks[i] && !dayBlockChecks[i]);
 
   const scored = [];
   await Promise.allSettled(candidates.map(async (t) => {
@@ -780,8 +817,10 @@ async function executeEntry(signal) {
       // فشلت التصفية — المزامنة العكسية ستلتقطه كمركز يتيم بالدورة القادمة
       await notifyError(`🚨 ${signal.ticker} نُفّذ تحت الأرضية (${realEntryPrice} < ${floorPrice}) وفشلت تصفيته — سيلتقطه فحص المراكز اليتيمة`).catch(() => {});
     }
-    // تهدئة أطول من المعتاد — السهم بحالة هبوط حاد، لا نعيد ترشيحه قريباً
+    // تهدئة أطول من المعتاد — والسهم بحالة هبوط حاد، فمع الحظر اليومي
+    // المفعّل لا نعيد ترشيحه لبقية اليوم أصلاً (خسارة = إشارة فاشلة)
     await setCooldown(signal.ticker, 1800).catch(() => {});
+    await applyLossDayBlock(signal.ticker, -1, 'entry_below_floor_liquidated');
     throw new Error(`entry_below_price_floor: filled=${realEntryPrice} floor=${floorPrice} (زخم الإشارة انتهى — سكين ساقطة)`);
   }
 
