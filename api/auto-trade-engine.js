@@ -754,6 +754,37 @@ async function executeEntry(signal) {
   }
   const realEntryPrice = parseFloat(filledOrder.filled_avg_price);
 
+  // ── ✨ الأرضية السعرية (حماية "السكين الساقطة") ──
+  // الفحص المسبق أعلاه يرفض الفجوات بالاتجاهين، لكنه قد يُخدع ببيانات
+  // متأخرة من Polygon (كما حصل مع NVDA: إشارة 210.81 وتنفيذ 207.44).
+  // الأمر الحدّي له سقف بطبيعته لكن لا أرضية — لو السهم ينهار، يمتلئ
+  // فوراً بالسعر الهابط. الحل الوحيد الموثوق: فحص سعر التنفيذ *الفعلي*؛
+  // لو تحت الأرضية معناها الزخم الذي بُنيت عليه الإشارة انتهى — نصفّي
+  // فوراً بخسارة سنتات بدل ركوب الهبوط حتى الوقف الكامل.
+  const floorPrice = +(signal.entry * (1 - MAX_ENTRY_GAP_PCT / 100)).toFixed(2);
+  if (realEntryPrice < floorPrice) {
+    console.error(`Entry below floor on ${signal.ticker}: filled=${realEntryPrice} floor=${floorPrice} — liquidating`);
+    const liqOrder = await closeEquityPositionMarket(signal.ticker, shares).catch((e) => {
+      console.error('Floor liquidation failed:', e.message);
+      return null;
+    });
+    if (liqOrder) {
+      const liqPrice = await pollOrderFillPrice(liqOrder.id).catch(() => null);
+      if (liqPrice != null) {
+        const pnl = (liqPrice - realEntryPrice) * shares;
+        await addToDailyPnL(pnl).catch(() => {});
+        await logDecision({ type: 'close', reason: 'entry_below_floor_liquidated', ticker: signal.ticker, qty: shares, entry: realEntryPrice, exitPrice: liqPrice, pnl, signalPrice: signal.entry, floorPrice }).catch(() => {});
+        await recordDailyTrade({ ticker: signal.ticker, qty: shares, entry: realEntryPrice, exitPrice: liqPrice, pnl, reason: 'entry_below_floor_liquidated', slippage: null }).catch(() => {});
+      }
+    } else {
+      // فشلت التصفية — المزامنة العكسية ستلتقطه كمركز يتيم بالدورة القادمة
+      await notifyError(`🚨 ${signal.ticker} نُفّذ تحت الأرضية (${realEntryPrice} < ${floorPrice}) وفشلت تصفيته — سيلتقطه فحص المراكز اليتيمة`).catch(() => {});
+    }
+    // تهدئة أطول من المعتاد — السهم بحالة هبوط حاد، لا نعيد ترشيحه قريباً
+    await setCooldown(signal.ticker, 1800).catch(() => {});
+    throw new Error(`entry_below_price_floor: filled=${realEntryPrice} floor=${floorPrice} (زخم الإشارة انتهى — سكين ساقطة)`);
+  }
+
   // ── حساب الهدف والوقف: من ATR الفعلي لو مفعّل ومتوفر، وإلا نسبة ثابتة ──
   let targetPrice, stopPrice, atrUsed = null;
   if (ENABLE_ATR_TARGETS) {
