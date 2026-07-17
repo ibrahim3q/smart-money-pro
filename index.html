@@ -713,10 +713,10 @@ body::before {
     </div>
     <div class="live-pill"><div class="live-dot"></div><span id="clk">--:--:--</span></div>
     <div class="mkt-pills">
-      <div class="mkp"><div class="mkp-v up">▲0.84%</div><div class="mkp-l">S&P 500</div></div>
-      <div class="mkp"><div class="mkp-v dn">▼0.23%</div><div class="mkp-l">NASDAQ</div></div>
-      <div class="mkp"><div class="mkp-v neu">18.4</div><div class="mkp-l">VIX</div></div>
-      <div class="mkp"><div class="mkp-v neu">0.73</div><div class="mkp-l">P/C</div></div>
+      <div class="mkp"><div class="mkp-v neu" id="mkp-spx">—</div><div class="mkp-l">S&P 500</div></div>
+      <div class="mkp"><div class="mkp-v neu" id="mkp-ndq">—</div><div class="mkp-l">NASDAQ</div></div>
+      <div class="mkp"><div class="mkp-v neu" id="mkp-vix">—</div><div class="mkp-l">VIX</div></div>
+      <div class="mkp"><div class="mkp-v neu" id="mkp-fg">—</div><div class="mkp-l">خوف/جشع</div></div>
     </div>
   </header>
 
@@ -750,24 +750,25 @@ body::before {
           <div class="card-title">🧭 الخوف والجشع</div>
           <svg viewBox="0 0 180 90" width="150" style="display:block;margin:4px auto">
             <path d="M15 80 A70 70 0 0 1 165 80" fill="none" stroke="#1C2D40" stroke-width="12" stroke-linecap="round"/>
-            <path d="M15 80 A70 70 0 0 1 165 80" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="66"/>
+            <path id="fg-arc" d="M15 80 A70 70 0 0 1 165 80" fill="none" stroke="url(#gg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="220" stroke-dashoffset="220"/>
             <defs><linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FF4560"/><stop offset="50%" stop-color="#FF9F43"/><stop offset="100%" stop-color="#00E676"/></linearGradient></defs>
-            <line x1="90" y1="80" x2="124" y2="36" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round"/>
+            <line id="fg-needle" x1="90" y1="80" x2="90" y2="25" stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round"/>
             <circle cx="90" cy="80" r="5" fill="#C9A84C"/>
           </svg>
-          <div class="fg-num">62</div>
-          <div class="fg-lbl">جشع</div>
-          <div class="fg-sub">تحذير: خطر تصحيح قريب</div>
+          <div class="fg-num" id="fg-num">—</div>
+          <div class="fg-lbl" id="fg-lbl">جارٍ التحميل...</div>
+          <div class="fg-sub" id="fg-sub">يُجلب من CNN Fear &amp; Greed لحظياً</div>
           <div class="g3" style="gap:6px;margin-top:10px">
-            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red)">23</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أسبوع</div></div>
-            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--orange)">48</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">شهر</div></div>
-            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--orange)">62</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">الآن</div></div>
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--tx3)">—</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">أسبوع</div></div>
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--tx3)">—</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">شهر</div></div>
+            <div style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px;text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--orange)" id="fg-now">—</div><div style="font-size:8px;color:var(--tx3);margin-top:2px">الآن</div></div>
           </div>
         </div>
         <!-- DARK POOL -->
         <div class="card">
           <div class="card-stripe"></div>
           <div class="card-title">🌑 Dark Pool — السلوك</div>
+          <div style="font-size:8px;color:var(--orange);margin-bottom:8px;padding:6px 8px;background:rgba(255,159,67,.06);border-radius:6px;border:1px solid rgba(255,159,67,.15)">⚠️ بيانات توضيحية — رصد Dark Pool الحقيقي يتطلب اشتراك بيانات مؤسسي منفصل</div>
           <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">NVDA</div><div class="pool-s">4.2M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">68%</div><div class="beh buy">🟢 تراكم</div></div></div>
           <div class="pool-row"><div><div class="pool-t">AAPL</div><div class="pool-s">2.8M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">54%</div><div class="beh sell">🔴 توزيع</div></div></div>
           <div class="pool-row"><div><div class="pool-t" style="color:var(--cyan)">META</div><div class="pool-s">1.6M سهم مخفي</div></div><div style="display:flex;align-items:center;gap:7px;margin-right:auto"><div class="pool-pct">74%</div><div class="beh buy">🟢 قوي</div></div></div>
@@ -819,7 +820,7 @@ body::before {
     <!-- ══════════ CHARTS ══════════ -->
     <div class="sec" id="sec-charts">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">📈 الرسوم البيانية + الزخم + التوقعات</div>
-      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">ذهبي = فعلي | أزرق متقطع = توقع Smart Money | أخضر شفاف = منطقة الدخول</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">ذهبي = شموع حقيقية من السوق | أزرق متقطع = مسار نظري نحو الهدف المحسوب | أخضر شفاف = منطقة الدخول</div>
       <div class="stock-tabs" id="ctabs"></div>
 
       <!-- PRICE ROW -->
@@ -871,8 +872,8 @@ body::before {
           <canvas id="MC" height="300"></canvas>
         </div>
         <div style="padding:8px 14px;border-top:1px solid var(--bd);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>السعر الفعلي</div>
-          <div class="leg"><div class="leg-line" style="background:var(--cyan)"></div>التوقع</div>
+          <div class="leg"><div class="leg-line" style="background:var(--gold)"></div>السعر الفعلي (شموع حقيقية)</div>
+          <div class="leg"><div class="leg-line" style="background:var(--cyan)"></div>مسار نظري للهدف</div>
           <div class="leg"><div class="leg-line" style="background:var(--green)"></div>الهدف</div>
           <div class="leg"><div class="leg-line" style="background:var(--red)"></div>الوقف</div>
           <div class="leg"><div class="leg-line" style="background:rgba(0,230,118,.3);width:14px;height:8px;border-radius:2px"></div>منطقة الدخول</div>
@@ -1198,7 +1199,10 @@ body::before {
     <!-- ══════════ AUTO-TRADING — التداول الآلي ══════════ -->
     <div class="sec" id="sec-autobot">
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">⚙️ التداول الآلي — المراقبة والتحكم</div>
-      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">Paper Trading عبر Alpaca — أسهم فقط، Bracket Orders</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">Paper Trading عبر Alpaca — أسهم فقط، دخول حدّي + حماية OCO</div>
+
+      <!-- ✨ شريط نبض المحرك (Dead Man's Switch) -->
+      <div id="at-heartbeat" style="display:none;margin-bottom:12px"></div>
 
       <!-- حالة النظام -->
       <div class="g4 mb14">
@@ -1228,6 +1232,14 @@ body::before {
           <button onclick="loadAutoTrade()" style="padding:7px 14px;border-radius:7px;background:var(--gglow);border:1px solid var(--gdim);color:var(--gold);font-size:10px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:36px">🔄 تحديث</button>
         </div>
         <div id="at-positions"><div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
+      </div>
+
+      <!-- ✨ صفقات اليوم المغلقة + جودة التنفيذ -->
+      <div class="card mb10">
+        <div class="card-stripe"></div>
+        <div class="card-title">📋 صفقات اليوم المغلقة + جودة التنفيذ</div>
+        <div style="font-size:8px;color:var(--tx3);margin-bottom:10px">الانزلاق = الفرق بين السعر المخطط والتنفيذ الفعلي بالدولار لكل سهم — السالب أسوأ من المخطط</div>
+        <div id="at-daily-trades"><div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">⏳ جارٍ التحميل...</div></div>
       </div>
 
       <!-- نقاط الثقة التاريخية لكل سهم -->
@@ -1653,51 +1665,68 @@ async function refreshPrices() {
   buildPTable();
 }
 
-// ═══════════════════════ CHART.JS ═══════════════════════
+// ═══════════════════════ CHART.JS — شموع حقيقية من Polygon ═══════════════════════
 let CI=null, CT='NVDA', CR='1W';
 const HCACHE={};
 
-function buildChart(ticker, range) {
+async function fetchHistory(ticker, range){
+  const key=ticker+':'+range;
+  const c=HCACHE[key];
+  if(c && Date.now()-c.at<60000) return c.data;
+  const res=await fetch(`/api/prices?type=history&ticker=${ticker}&range=${range}`);
+  const d=await res.json();
+  const results=(d.results||[]).filter(b=>b&&b.c>0);
+  HCACHE[key]={at:Date.now(),data:results};
+  return results;
+}
+
+async function buildChart(ticker, range) {
   const s=D[ticker], lp=LP[ticker]||{};
-  const base=lp.p||s.base;
-  const pts=range==='1D'?78:range==='1W'?42:range==='1M'?31:46;
-  const pp=Math.round(pts*.72), fp=pts-pp;
-  const now=new Date();
-  const step=range==='1D'?300000:range==='1W'?3600000:86400000;
+  const ctx=document.getElementById('MC');
+  if(!ctx)return;
+
+  // ✅ إصلاح جوهري: "السعر الفعلي" كان أرقاماً عشوائية مولّدة بالكود —
+  // الآن شموع حقيقية من /api/prices?type=history (كان جاهزاً وغير مستخدم)
+  let candles=[];
+  try{ candles=await fetchHistory(ticker,range); }catch(e){ console.warn('history:',e.message); }
+  if(CT!==ticker) return; // المستخدم بدّل السهم أثناء الجلب
+
   const fmt=range==='1D'
     ?d=>`${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`
     :d=>`${d.getMonth()+1}/${d.getDate()}`;
-  const dir=s.beh==='sell'?-1:s.beh==='watch'?.1:1;
-  const tgt=+(base*(1+dir*.10)).toFixed(2);
-  const stp=+(base*(1-dir*.045)).toFixed(2);
 
-  let labels=[],actData=[],foreData=[];
-  let p=base*.91;
-  for(let i=pp;i>=0;i--){
-    p+=(Math.random()-.46)*base*.004+dir*base*.0009;
-    p=Math.max(p,stp*.88);
-    actData.unshift(+p.toFixed(2));
-    labels.unshift(fmt(new Date(now-i*step)));
+  let labels=[],actData=[];
+  if(candles.length>0){
+    candles.forEach(b=>{labels.push(fmt(new Date(b.t)));actData.push(+b.c.toFixed(2));});
+  }else{
+    // لا بيانات تاريخية متاحة — نرسم آخر نقطتين حقيقيتين بدل التلفيق
+    labels=['إغلاق أمس','الآن'];
+    actData=[+((lp.prev||s.base)).toFixed(2),+((lp.p||s.base)).toFixed(2)];
   }
+
+  const lv=calcLevels(ticker);
+  const tgt=lv.target, stp=lv.stop;
   const lastP=actData[actData.length-1];
-  const goal=(s.beh==='sell'?stp:tgt)-lastP;
-  foreData=[...Array(pp).fill(null),lastP];
+
+  // خط مستقيم من آخر سعر حقيقي نحو الهدف المحسوب — "مسار نظري" وليس تنبؤاً
+  const fp=Math.max(4,Math.round(actData.length*.25));
+  const stepMs=candles.length>1?(candles[candles.length-1].t-candles[candles.length-2].t):86400000;
+  const lastT=candles.length>0?candles[candles.length-1].t:Date.now();
+  const foreData=[...Array(actData.length-1).fill(null),lastP];
   for(let i=1;i<=fp;i++){
-    const t=i/fp;
-    foreData.push(+(lastP+goal*Math.pow(t,.7)+(Math.random()-.5)*Math.abs(goal)*.08).toFixed(2));
-    labels.push(fmt(new Date(now+i*step)));
+    foreData.push(+(lastP+(tgt-lastP)*(i/fp)).toFixed(2));
+    labels.push(fmt(new Date(lastT+i*stepMs)));
     actData.push(null);
   }
-  const eMin=+(base*.978).toFixed(2),eMax=+(base*.992).toFixed(2);
+
+  const eMin=lv.e1Lo, eMax=lv.e1Hi;
   const ezD=actData.map(p=>p!==null&&p>=eMin&&p<=eMax?eMax:null);
-  const ctx=document.getElementById('MC');
-  if(!ctx)return;
   if(CI)CI.destroy();
   CI=new Chart(ctx.getContext('2d'),{
     type:'line',
     data:{labels,datasets:[
       {label:'السعر',data:actData,borderColor:'#C9A84C',borderWidth:2.2,pointRadius:0,pointHoverRadius:3,tension:.35,fill:false,order:1},
-      {label:'التوقع',data:foreData,borderColor:'#00D4FF',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.4,fill:false,order:2},
+      {label:'مسار نظري',data:foreData,borderColor:'#00D4FF',borderWidth:2,borderDash:[7,4],pointRadius:0,tension:.4,fill:false,order:2},
       {label:'الهدف',data:Array(labels.length).fill(s.beh==='sell'?stp:tgt),borderColor:s.beh==='sell'?'#FF4560':'#00E676',borderWidth:1.2,borderDash:[4,3],pointRadius:0,tension:0,fill:false,order:3},
       {label:'الوقف',data:Array(labels.length).fill(stp),borderColor:'#FF4560',borderWidth:1,borderDash:[3,3],pointRadius:0,tension:0,fill:false,order:4},
       {label:'منطقة دخول',data:ezD,borderColor:'transparent',backgroundColor:'rgba(0,230,118,.07)',fill:{target:{value:eMin},above:'rgba(0,230,118,.09)',below:'transparent'},pointRadius:0,tension:0,order:5},
@@ -1807,28 +1836,87 @@ function selStock(t) {
     </div>`).join('');
 }
 
-function updMom(t){
-  const m=D[t].mom;
-  const rc=m.rsi>70?'var(--red)':m.rsi>50?'var(--orange)':'var(--green)';
-  const rs=m.rsi>70?'تشبع ⚠️':m.rsi>50?'محايد':'ذروة بيع 🟢';
-  const mc=m.macd>0?'var(--green)':'var(--red)';
-  const sc=m.sto>80?'var(--red)':m.sto>50?'var(--orange)':'var(--green)';
-  const ss=m.sto>80?'تشبع ⚠️':m.sto>50?'محايد':'ذروة بيع 🟢';
-  const ac=m.adx>30?'var(--green)':m.adx>20?'var(--orange)':'var(--tx3)';
-  const ec=m.ema==='صاعد'?'var(--green)':m.ema==='هابط'?'var(--red)':'var(--orange)';
-  const total=m.score;const tc2=total>65?'var(--green)':total>40?'var(--orange)':'var(--red)';
-  const ts=total>65?'🟢 شراء':total>40?'🟡 محايد':'🔴 بيع';
-  const set=(id,v,c)=>{const e=document.getElementById(id);if(e){e.textContent=v;e.style.color=c;}};
-  set('m-rsi',m.rsi,rc);set('m-rsi-s',rs,rc);
-  set('m-macd',(m.macd>0?'+':'')+m.macd,mc);set('m-macd-s',m.macd>0?'🟢 صعودي':'🔴 هبوطي',mc);
-  set('m-sto',m.sto,sc);set('m-sto-s',ss,sc);
-  set('m-adx',m.adx,ac);set('m-adx-s',m.adx>30?'قوي':m.adx>20?'متوسط':'ضعيف',ac);
-  set('m-bb',m.bb,'var(--tx2)');set('m-bb-s','نطاق طبيعي','var(--tx3)');
-  set('m-ema','↑ '+m.ema,ec);set('m-ema-s',m.ema==='صاعد'?'Golden ✕':'محايد',ec);
-  set('m-vol',D[t].vol,'var(--cyan)');set('m-vol-s','غير طبيعي','var(--cyan)');
-  set('m-tot',total>65?'قوي':total>40?'محايد':'ضعيف',tc2);set('m-tot-s',ts,tc2);
+// ✅ إصلاح جوهري: كانت أرقام RSI/MACD مكتوبة يدوياً بالكود ولا تتغير أبداً —
+// الآن تُجلب حقيقية من /api/prices?type=indicators (كان جاهزاً وغير مستخدم).
+// Stochastic/ADX/Bollinger غير متوفرة من المصدر فتُعرض "غير متاح" بصدق
+// بدل أرقام موهمة.
+const INDCACHE={};
+
+async function updMom(t){
+  const set=(id,v,c)=>{const e=document.getElementById(id);if(e){e.textContent=v;if(c)e.style.color=c;}};
+  ['m-rsi','m-macd','m-sto','m-adx','m-bb','m-ema','m-vol','m-tot'].forEach(id=>set(id,'…','var(--tx3)'));
+
+  let ind=null;
+  try{
+    const c=INDCACHE[t];
+    if(c && Date.now()-c.at<60000){ ind=c.data; }
+    else{
+      const r=await fetch(`/api/prices?type=indicators&ticker=${t}`);
+      ind=await r.json();
+      INDCACHE[t]={at:Date.now(),data:ind};
+    }
+  }catch(e){ console.warn('indicators:',e.message); }
+  if(CT!==t) return; // المستخدم بدّل السهم أثناء الجلب
+
+  const price=LP[t]?.p||D[t].base;
+  const rsi=(ind&&ind.rsi!=null)?+(+ind.rsi).toFixed(1):null;
+  const hist=(ind&&ind.macd&&ind.macd.histogram!=null)?+(+ind.macd.histogram).toFixed(2):null;
+  const ema20=(ind&&ind.ema20!=null)?+(+ind.ema20).toFixed(2):null;
+  const sma50=(ind&&ind.sma50!=null)?+(+ind.sma50).toFixed(2):null;
+
+  // RSI حقيقي
+  if(rsi!=null){
+    const rc=rsi>70?'var(--red)':rsi<30?'var(--green)':rsi>50?'var(--orange)':'var(--tx2)';
+    set('m-rsi',rsi,rc); set('m-rsi-s',rsi>70?'تشبع شراء ⚠️':rsi<30?'ذروة بيع 🟢':'محايد',rc);
+  }else{ set('m-rsi','—','var(--tx3)'); set('m-rsi-s','غير متاح','var(--tx3)'); }
+
+  // MACD Histogram حقيقي
+  if(hist!=null){
+    const mc=hist>0?'var(--green)':'var(--red)';
+    set('m-macd',(hist>0?'+':'')+hist,mc); set('m-macd-s',hist>0?'🟢 صعودي':'🔴 هبوطي',mc);
+  }else{ set('m-macd','—','var(--tx3)'); set('m-macd-s','غير متاح','var(--tx3)'); }
+
+  // غير متوفرة من المصدر — عرض صادق
+  set('m-sto','—','var(--tx3)'); set('m-sto-s','غير متاح','var(--tx3)');
+  set('m-adx','—','var(--tx3)'); set('m-adx-s','غير متاح','var(--tx3)');
+  set('m-bb','—','var(--tx3)'); set('m-bb-s','غير متاح','var(--tx3)');
+
+  // اتجاه حقيقي: السعر مقابل EMA20 وSMA50
+  if(ema20!=null&&sma50!=null){
+    const aboveBoth=price>ema20&&price>sma50, belowBoth=price<ema20&&price<sma50;
+    const ec=aboveBoth?'var(--green)':belowBoth?'var(--red)':'var(--orange)';
+    set('m-ema',aboveBoth?'↑ صاعد':belowBoth?'↓ هابط':'مختلط',ec);
+    set('m-ema-s',`EMA20: $${ema20.toFixed(0)}`,ec);
+  }else{ set('m-ema','—','var(--tx3)'); set('m-ema-s','غير متاح','var(--tx3)'); }
+
+  // حجم حقيقي مقابل المتوسط
+  const vol=LP[t]?.vol||0, avg=AVG_VOL[t]||0;
+  if(vol>0&&avg>0){
+    const ratio=vol/avg;
+    const vc=ratio>=1.5?'var(--cyan)':'var(--tx2)';
+    set('m-vol',ratio.toFixed(1)+'x',vc); set('m-vol-s',ratio>=1.5?'نشاط مرتفع':'طبيعي',vc);
+  }else{ set('m-vol','—','var(--tx3)'); set('m-vol-s','غير متاح','var(--tx3)'); }
+
+  // مقياس مركّب من القيم الحقيقية المتاحة فقط
+  let score=null;
+  if(rsi!=null&&hist!=null&&ema20!=null){
+    score=0;
+    score+=hist>0?35:10;
+    score+=price>ema20?25:5;
+    score+=rsi>=50&&rsi<=70?25:rsi>70?5:rsi>=40?15:20;
+    score+=(vol>0&&avg>0&&vol/avg>=1.2)?15:8;
+    score=Math.min(100,score);
+  }
   const bar=document.getElementById('m-bar');
-  if(bar){bar.style.width=total+'%';bar.style.background=`linear-gradient(90deg,${tc2},${tc2}99)`;}
+  if(score!=null){
+    const tc2=score>65?'var(--green)':score>40?'var(--orange)':'var(--red)';
+    set('m-tot',score>65?'قوي':score>40?'محايد':'ضعيف',tc2);
+    set('m-tot-s',score>65?'🟢 إيجابي':score>40?'🟡 محايد':'🔴 سلبي',tc2);
+    if(bar){bar.style.width=score+'%';bar.style.background=`linear-gradient(90deg,${tc2},${tc2}99)`;}
+  }else{
+    set('m-tot','—','var(--tx3)'); set('m-tot-s','بيانات ناقصة','var(--tx3)');
+    if(bar) bar.style.width='0%';
+  }
 }
 
 // Build tabs
@@ -2360,6 +2448,51 @@ function renderOptions(options,capital,risk){
   el.innerHTML = html;
 }
 
+// ═══ ✨ MARKET MOOD — الخوف/الجشع وVIX حقيقيان من type=market ═══
+async function loadMarketMood(){
+  try{
+    const r=await fetch('/api/prices?type=market');
+    const d=await r.json();
+
+    // VIX (تقريبي عبر VIXY حسب الباك إند)
+    if(d.vix){ const v=document.getElementById('mkp-vix'); if(v){v.textContent=(+d.vix).toFixed(1); v.className='mkp-v '+(d.vix>25?'dn':d.vix>18?'neu':'up');} }
+
+    // Fear & Greed
+    if(d.fearGreed!=null){
+      const s=Math.round(d.fearGreed);
+      const lbl=s>=75?'جشع شديد':s>=55?'جشع':s>45?'محايد':s>=25?'خوف':'خوف شديد';
+      const col=s>=75?'var(--red)':s>=55?'var(--orange)':s>45?'var(--tx2)':s>=25?'var(--cyan)':'var(--green)';
+      const set=(id,v)=>{const e=document.getElementById(id);if(e){e.textContent=v;e.style.color=col;}};
+      set('fg-num',s); set('fg-lbl',lbl); set('fg-now',s);
+      const sub=document.getElementById('fg-sub');
+      if(sub) sub.textContent=s>=75?'تحذير: جشع مفرط — خطر تصحيح مرتفع':s<=25?'خوف مرتفع — تاريخياً منطقة فرص للمتراكمين':'مزاج السوق ضمن النطاق الطبيعي';
+      const fgPill=document.getElementById('mkp-fg');
+      if(fgPill){ fgPill.textContent=s; fgPill.className='mkp-v '+(s>=55?'neu':'up'); }
+      // تحريك القوس والإبرة لموضع القيمة الحقيقية
+      const arc=document.getElementById('fg-arc');
+      if(arc) arc.setAttribute('stroke-dashoffset',String(Math.round(220*(1-s/100))));
+      const nd=document.getElementById('fg-needle');
+      if(nd){
+        const th=Math.PI*(1-s/100);
+        nd.setAttribute('x2',(90+55*Math.cos(th)).toFixed(1));
+        nd.setAttribute('y2',(80-55*Math.sin(th)).toFixed(1));
+      }
+    }
+  }catch(e){ console.warn('market mood:',e.message); }
+}
+
+// مؤشرا S&P/NASDAQ بالهيدر من الأسعار الحية الفعلية (SPY/QQQ)
+function updIndexPills(){
+  [['mkp-spx','SPY'],['mkp-ndq','QQQ']].forEach(([id,t])=>{
+    const el=document.getElementById(id);
+    const pct=LP[t]?.chgPct;
+    if(el&&pct!=null&&LP[t].source!=='sim'){
+      el.textContent=(pct>=0?'▲+':'▼')+Math.abs(pct).toFixed(2)+'%';
+      el.className='mkp-v '+(pct>=0?'up':'dn');
+    }
+  });
+}
+
 // ═══ BOT ═══
 let botOpen=false;
 function toggleBot(){
@@ -2529,6 +2662,30 @@ function clearJournal(){
 let _atKillActive = null;
 let _atToken = null; // يُحفظ بالذاكرة فقط أثناء الجلسة — لا يُخزّن أبداً
 
+// ✨ قاموس عام (يُستخدم بسجل القرارات وجدول صفقات اليوم) — محدّث بأسباب المحرك الجديدة
+const reasonAr = {
+  kill_switch_active:'الإيقاف الطارئ مفعّل', market_closed:'السوق مغلق',
+  daily_loss_circuit_breaker:'قاطع الدائرة اليومي', max_positions_reached:'وصل حد الصفقات المتزامنة',
+  max_daily_trades_reached:'وصل حد الصفقات اليومي', outside_entry_window:'خارج نافذة الدخول',
+  another_cycle_running:'دورة أخرى شغالة', account_sanity_check_failed:'فشل فحص الحساب',
+  target_filled:'تحقق الهدف ✅', stop_loss_filled:'ضرب الوقف', stop_loss_triggered:'ضرب الوقف',
+  target_hit_direct_check:'تحقق الهدف (فحص مباشر) ✅', stop_hit_direct_check:'ضرب الوقف (فحص مباشر)',
+  end_of_day_forced_close:'إغلاق نهاية اليوم الإجباري', target_filled_synced:'تحقق الهدف (مزامنة) ✅',
+  stop_loss_filled_synced:'ضرب الوقف (مزامنة)',
+  price_gap_too_large:'تجاوز فجوة التنفيذ المسموحة ⚠️',
+  price_ceiling_not_reached:'السعر تجاوز السقف المسموح — لم يُنفَّذ (فوّتنا الصفقة عمداً) 🚫',
+  profit_lock_trailing:'قفل ربح متحرك 🔒✅',
+  // ✨ أسباب المحرك المحدّث
+  entry_below_floor_liquidated:'تنفيذ تحت الأرضية (سكين ساقطة) — صُفّي فوراً 🛡️',
+  entry_below_price_floor:'رُفض الدخول — السعر انهار تحت أرضية الإشارة 🚫',
+  oco_failed_liquidated:'فشل ربط الحماية — صُفّي فوراً بدل تركه عارياً 🛡️',
+  partial_fill_liquidated:'تنفيذ جزئي — صُفّي فوراً 🛡️',
+  orphan_position_detected:'مركز مجهول عند الوسيط ⚠️',
+  unfavorable_market_condition:'السوق العام غير مواتٍ (SPY تحت متوسطه)',
+  no_signal:'لا إشارة مطابقة للشروط',
+  position_too_expensive:'السهم أغلى من سقف رأس المال المسموح',
+};
+
 async function loadAutoTrade(){
   try{
     const res = await fetch('/api/trade-log');
@@ -2553,6 +2710,50 @@ async function loadAutoTrade(){
     if(brEl){
       brEl.textContent = d.breakerTripped ? '⛔ مفعّل' : '✅ سليم';
       brEl.style.color = d.breakerTripped ? 'var(--red)' : 'var(--green)';
+    }
+
+    // ✨ شريط نبض المحرك — أهم إنذار باللوحة كلها
+    const hb = document.getElementById('at-heartbeat');
+    if(hb){
+      const secs = d.secondsSinceLastRun;
+      const mktOpen = getSess().id==='open';
+      hb.style.display='block';
+      if(secs==null){
+        hb.innerHTML = `<div style="background:var(--s2);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;font-size:10px;color:var(--tx3)">🩺 لم يسجّل المحرك أي نبض بعد — طبيعي قبل أول تشغيل للـcron</div>`;
+      } else if(mktOpen && secs>360){
+        const mins = Math.floor(secs/60);
+        hb.innerHTML = `<div style="background:rgba(255,69,96,.12);border:1px solid rgba(255,69,96,.4);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">🚨</span>
+          <div><div style="font-size:11px;font-weight:700;color:var(--red)">نبض المحرك منقطع منذ ${mins} دقيقة والسوق مفتوح!</div>
+          <div style="font-size:9px;color:var(--tx2);margin-top:2px">الـcron متوقف — أي مراكز مفتوحة محمية بأوامر OCO عند الوسيط فقط، بلا مراقبة برمجية. افحص Vercel فوراً.</div></div>
+        </div>`;
+      } else {
+        const ago = secs<120 ? `${secs} ثانية` : `${Math.floor(secs/60)} دقيقة`;
+        hb.innerHTML = `<div style="background:rgba(0,230,118,.05);border:1px solid rgba(0,230,118,.15);border-radius:10px;padding:8px 14px;font-size:10px;color:var(--green);display:flex;align-items:center;gap:6px"><div class="live-dot"></div>🩺 نبض المحرك سليم — آخر تشغيل قبل ${ago}${mktOpen?'':' (السوق مغلق)'}</div>`;
+      }
+    }
+
+    // ✨ جدول صفقات اليوم المغلقة + الانزلاق
+    const dtEl = document.getElementById('at-daily-trades');
+    if(dtEl){
+      const trades = d.dailyTrades||[];
+      dtEl.innerHTML = trades.length===0
+        ? '<div style="text-align:center;padding:16px;color:var(--tx3);font-size:10px">لا صفقات مغلقة اليوم بعد</div>'
+        : `<div style="overflow-x:auto"><table class="sig-tbl" style="font-size:10px">
+            <thead><tr><th>السهم</th><th>الكمية</th><th>دخول ← خروج</th><th>النتيجة</th><th>الانزلاق/سهم</th><th>السبب</th></tr></thead>
+            <tbody>${trades.map(t=>{
+              const pc = (t.pnl||0)>=0?'var(--green)':'var(--red)';
+              const slip = t.slippage!=null ? `<span style="color:${t.slippage>=0?'var(--green)':'var(--orange)'}">${t.slippage>=0?'+':''}$${(+t.slippage).toFixed(3)}</span>` : '<span style="color:var(--tx3)">—</span>';
+              return `<tr>
+                <td><span class="tk">${t.ticker}</span></td>
+                <td class="pn n">${t.qty}</td>
+                <td class="pn n">$${(+t.entry).toFixed(2)} ← $${(+t.exitPrice).toFixed(2)}</td>
+                <td class="pn" style="color:${pc};font-weight:700">${(t.pnl||0)>=0?'+':''}$${(t.pnl||0).toFixed(2)}</td>
+                <td class="pn">${slip}</td>
+                <td style="font-size:8px;color:var(--tx3)">${reasonAr[t.reason]||t.reason||''}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table></div>`;
     }
 
     // زر Kill Switch
@@ -2582,7 +2783,7 @@ async function loadAutoTrade(){
               <div style="background:rgba(255,69,96,.06);border-radius:6px;padding:7px;text-align:center">وقف<br><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--red)">$${p.stopLoss}</span></div>
             </div>
             <div style="font-size:8px;color:var(--tx3);margin-top:7px">
-              ${p.takeProfitOrderId&&p.stopLossOrderId?'🛡️ محمي بالكامل عند الوسيط (Bracket)':'⚠️ حماية جزئية — يعتمد على المراقبة الدورية'}
+              ${p.takeProfitOrderId&&p.stopLossOrderId?'🛡️ محمي بالكامل عند الوسيط (OCO: هدف + وقف)':'⚠️ حماية جزئية — يعتمد على المراقبة الدورية'}
               — ${p.reason||''}
             </div>
           </div>`).join('');
@@ -2622,20 +2823,9 @@ async function loadAutoTrade(){
         error: {icon:'⚠️', label:'خطأ',         color:'var(--red)'},
         kill_switch_toggle: {icon:'🎛️', label:'تبديل الإيقاف', color:'var(--orange)'},
         skip_summary: {icon:'⏭️', label:'تخطّي متكرر', color:'var(--tx3)'},
+        orphan_position_detected: {icon:'👻', label:'مركز يتيم', color:'var(--orange)'},
       };
-      const reasonAr = {
-        kill_switch_active:'الإيقاف الطارئ مفعّل', market_closed:'السوق مغلق',
-        daily_loss_circuit_breaker:'قاطع الدائرة اليومي', max_positions_reached:'وصل حد الصفقات المتزامنة',
-        max_daily_trades_reached:'وصل حد الصفقات اليومي', outside_entry_window:'خارج نافذة الدخول (أول 15 دقيقة)',
-        another_cycle_running:'دورة أخرى شغالة', account_sanity_check_failed:'فشل فحص الحساب',
-        target_filled:'تحقق الهدف ✅', stop_loss_filled:'ضرب الوقف', stop_loss_triggered:'ضرب الوقف',
-        target_hit_direct_check:'تحقق الهدف (فحص مباشر) ✅', stop_hit_direct_check:'ضرب الوقف (فحص مباشر)',
-        end_of_day_forced_close:'إغلاق نهاية اليوم الإجباري', target_filled_synced:'تحقق الهدف (مزامنة) ✅',
-        stop_loss_filled_synced:'ضرب الوقف (مزامنة)',
-        price_gap_too_large:'تجاوز فجوة التنفيذ المسموحة ⚠️',
-        price_ceiling_not_reached:'السعر تجاوز السقف المسموح — لم يُنفَّذ (فوّتنا الصفقة عمداً) 🚫',
-        profit_lock_trailing:'قفل ربح متحرك 🔒✅',
-      };
+      // (قاموس reasonAr صار معرّفاً بمستوى عام أعلاه — يُستخدم هنا وبجدول صفقات اليوم)
       decEl.innerHTML = decisions.length===0
         ? '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:10px">لا توجد قرارات مسجلة بعد</div>'
         : decisions.map(dec=>{
@@ -2644,10 +2834,12 @@ async function loadAutoTrade(){
             let detail = '';
             if(dec.type==='open' && dec.opened) detail = `${dec.opened.ticker} × ${dec.opened.qty} @ $${dec.opened.entry}`;
             else if(dec.type==='close' && dec.position) detail = `${dec.position.ticker} — ${reasonAr[dec.result?.reason]||dec.result?.reason||''} — ${dec.result?.pnl>=0?'+':''}$${(dec.result?.pnl||0).toFixed(0)}`;
+            else if(dec.type==='close' && dec.ticker) detail = `${dec.ticker} — ${reasonAr[dec.reason]||dec.reason||''} — ${(dec.pnl||0)>=0?'+':''}$${(dec.pnl||0).toFixed(0)}`;
+            else if(dec.type==='orphan_position_detected') detail = `${dec.symbol} × ${dec.qty} — ${dec.action==='liquidate'?'تمت تصفيته فوراً':'إشعار فقط — راجعه يدوياً'}`;
             else if(dec.type==='skip_summary'){
               const fromT = new Date(dec.from).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
               const toT = new Date(dec.to).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
-              detail = `${reasonAr[dec.reason]||dec.reason} × ${dec.count} مرة (${fromT} → ${toT})`;
+              detail = `${reasonAr[dec.reason]||dec.reason||'لا إشارة مطابقة للشروط'} × ${dec.count} مرة (${fromT} → ${toT})`;
             }
             else if(dec.reason) detail = reasonAr[dec.reason]||dec.reason;
             return `<div style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(28,45,64,.35)">
@@ -2770,9 +2962,11 @@ try{checkTradeAlerts();}catch(e){}
 // ═══ POLLING ═══
 setTimeout(()=>{
   fetchPolygonPrices()
-    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} try{buildVolRows();}catch(e){} try{checkTradeAlerts();}catch(e){} })
+    .then(()=>{ try{buildLPGrid();}catch(e){} try{buildPTable();}catch(e){} try{buildSig();}catch(e){} try{buildMP();}catch(e){} try{buildVolRows();}catch(e){} try{updIndexPills();}catch(e){} try{checkTradeAlerts();}catch(e){} })
     .catch(e=>console.warn('init:',e));
+  try{loadMarketMood();}catch(e){}
 },800);
+setInterval(()=>{ try{loadMarketMood();}catch(e){} }, 120000); // مزاج السوق كل دقيقتين
 
 function startPolygonPolling(){
   const sess=getSess().id;
@@ -2792,6 +2986,7 @@ function startPolygonPolling(){
         if(cel){cel.textContent=(pct>=0?'▲ +':'▼ ')+Math.abs(pct).toFixed(2)+'%';cel.className='pr-chg '+(pct>=0?'up':'dn');}
       }
       try{buildSig();}catch(e){}
+      try{updIndexPills();}catch(e){}
       try{checkTradeAlerts();}catch(e){}
     }catch(e){console.warn('poll:',e);}
     startPolygonPolling();
