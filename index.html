@@ -1258,6 +1258,60 @@ body::before {
       </div>
     </div>
 
+    <!-- ══════════ DIAGNOSTICS — التشخيص ══════════ -->
+    <div class="sec" id="sec-diag">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">🔬 التشخيص — أرشيف الصفقات الدائم</div>
+      <div style="font-size:9px;color:var(--tx3);margin-bottom:12px">كل صفقة تُغلق تُحفظ هنا للأبد بتفاصيلها الكاملة — اضغط أي صف لعرض إشارتها الأصلية</div>
+
+      <!-- إحصائيات المجموعة المفلترة -->
+      <div class="g4 mb14">
+        <div class="stat-card"><div class="stat-icon si-g">📊</div><div><div class="stat-val" id="dg-count">—</div><div class="stat-lbl">صفقات مؤرشفة</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-gr">🎯</div><div><div class="stat-val" id="dg-winrate">—</div><div class="stat-lbl">نسبة النجاح</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-c">💰</div><div><div class="stat-val" id="dg-pnl">—</div><div class="stat-lbl">الصافي</div></div></div>
+        <div class="stat-card"><div class="stat-icon si-r">⚡</div><div><div class="stat-val" id="dg-slip" style="font-size:15px">—</div><div class="stat-lbl">متوسط الانزلاق/سهم</div></div></div>
+      </div>
+
+      <!-- الفلاتر -->
+      <div class="card mb10">
+        <div class="card-stripe"></div>
+        <div class="card-title">🔎 الفلاتر</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:4px">السهم</div>
+            <select id="dg-ticker" style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;min-width:100px"><option value="">الكل</option></select>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:4px">سبب الإغلاق</div>
+            <select id="dg-reason" style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:8px 10px;color:var(--tx);font-family:'IBM Plex Sans Arabic',sans-serif;font-size:10px;outline:none;min-width:140px"><option value="">الكل</option></select>
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:4px">من تاريخ</div>
+            <input type="date" id="dg-from" style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:7px 10px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none">
+          </div>
+          <div>
+            <div style="font-size:9px;color:var(--tx3);margin-bottom:4px">إلى تاريخ</div>
+            <input type="date" id="dg-to" style="background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:7px 10px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:10px;outline:none">
+          </div>
+          <button onclick="loadDiag()" style="padding:9px 18px;border-radius:8px;background:var(--gglow);border:1px solid var(--gdim);color:var(--gold);font-size:11px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:38px">تطبيق</button>
+          <button onclick="dgResetFilters()" style="padding:9px 14px;border-radius:8px;background:var(--s2);border:1px solid var(--bd);color:var(--tx2);font-size:10px;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:38px">مسح</button>
+          <div style="flex:1"></div>
+          <button onclick="dgExportCSV()" style="padding:9px 18px;border-radius:8px;background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.25);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;font-family:'IBM Plex Sans Arabic',sans-serif;min-height:38px">📥 تصدير CSV</button>
+        </div>
+      </div>
+
+      <!-- جدول الأرشيف -->
+      <div class="card">
+        <div class="card-stripe"></div>
+        <div class="card-title">📋 الصفقات (الأحدث أولاً)</div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="sig-tbl" style="font-size:10px">
+            <thead><tr><th>التاريخ</th><th>السهم</th><th>الكمية</th><th>دخول ← خروج</th><th>النتيجة</th><th>الانزلاق</th><th>الجودة</th><th>السبب</th></tr></thead>
+            <tbody id="dg-list"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--tx3)">⏳ جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /app-content -->
 
   <!-- ─── BOTTOM NAV ─── -->
@@ -1269,6 +1323,7 @@ body::before {
     <div class="nav-item" onclick="goTo('news')"><span class="nav-icon">📰</span><span class="nav-lbl">أخبار</span></div>
     <div class="nav-item" onclick="goTo('options')"><span class="nav-icon">💰</span><span class="nav-lbl">خيارات</span></div>
     <div class="nav-item" onclick="goTo('autobot')"><span class="nav-icon">⚙️</span><span class="nav-lbl">آلي</span></div>
+    <div class="nav-item" onclick="goTo('diag')"><span class="nav-icon">🔬</span><span class="nav-lbl">تشخيص</span></div>
     <div class="nav-item" onclick="goTo('journal')" style="position:relative"><span class="nav-icon">📒</span><span class="nav-lbl">سجل</span><div id="journal-alert-badge" style="display:none;position:absolute;top:2px;left:8px;width:9px;height:9px;background:var(--red);border-radius:50%;border:1.5px solid var(--bg);animation:blink 1.5s infinite"></div></div>
     <div class="nav-item" onclick="goTo('wyckoff')"><span class="nav-icon">🔄</span><span class="nav-lbl">Wyckoff</span></div>
     <div class="nav-item" onclick="goTo('whales')"><span class="nav-icon">🐋</span><span class="nav-lbl">حيتان</span></div>
@@ -2060,8 +2115,8 @@ const WD={
 function pickWy(el,k){document.querySelectorAll('.wy-card').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('wy-t').textContent=WD[k].t;document.getElementById('wy-b').textContent=WD[k].b;}
 
 // ═══ NAVIGATION ═══
-const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',autobot:'التداول الآلي',journal:'سجل الصفقات',wyckoff:'منهج Wyckoff',whales:'تدفق الحيتان',ai:'المحلل الذكي'};
-const navOrder=['dashboard','livep','charts','signals','news','options','autobot','journal','wyckoff','whales','ai'];
+const SM={dashboard:'لوحة التحكم',livep:'الأسعار اللحظية',charts:'الرسوم البيانية والتوقعات',signals:'الإشارات النشطة',news:'الأخبار اللحظية',options:'محلل عقود الخيارات',autobot:'التداول الآلي',diag:'التشخيص — أرشيف الصفقات',journal:'سجل الصفقات',wyckoff:'منهج Wyckoff',whales:'تدفق الحيتان',ai:'المحلل الذكي'};
+const navOrder=['dashboard','livep','charts','signals','news','options','autobot','diag','journal','wyckoff','whales','ai'];
 
 function goTo(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -2080,6 +2135,7 @@ function goTo(id){
   if(id==='news') setTimeout(()=>loadNews('all'),200);
   if(id==='journal') renderJournal();
   if(id==='autobot') loadAutoTrade();
+  if(id==='diag') loadDiag();
 }
 
 // ═══════════════════════ NEWS — الأخبار ═══════════════════════
@@ -2493,6 +2549,96 @@ function updIndexPills(){
   });
 }
 
+// ═══ ✨ DIAGNOSTICS — قسم التشخيص (الأرشيف الدائم) ═══
+let _dgTrades=[];
+let _dgFiltersPopulated=false;
+
+function dgParams(){
+  const p=new URLSearchParams();
+  const t=document.getElementById('dg-ticker')?.value; if(t)p.set('ticker',t);
+  const r=document.getElementById('dg-reason')?.value; if(r)p.set('reason',r);
+  const f=document.getElementById('dg-from')?.value; if(f)p.set('from',f);
+  const o=document.getElementById('dg-to')?.value; if(o)p.set('to',o);
+  return p;
+}
+
+async function loadDiag(){
+  const listEl=document.getElementById('dg-list');
+  if(!listEl) return;
+  listEl.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--tx3)">⏳ جارٍ التحميل...</td></tr>';
+  try{
+    const res=await fetch('/api/trade-archive?'+dgParams().toString());
+    const d=await res.json();
+    if(d.error) throw new Error(d.error);
+    _dgTrades=d.trades||[];
+    const st=d.stats||{};
+
+    const set=(id,v,c)=>{const e=document.getElementById(id);if(e){e.textContent=v;if(c)e.style.color=c;}};
+    set('dg-count',st.count??0);
+    set('dg-winrate',st.winRatePct!=null?st.winRatePct.toFixed(0)+'%':'—',st.winRatePct>=40?'var(--green)':st.winRatePct!=null?'var(--orange)':'');
+    set('dg-pnl',(st.totalPnl>=0?'+':'')+'$'+(st.totalPnl??0).toFixed(2),(st.totalPnl??0)>=0?'var(--green)':'var(--red)');
+    set('dg-slip',st.avgSlippage!=null?(st.avgSlippage>=0?'+':'')+'$'+st.avgSlippage.toFixed(3):'—');
+
+    // تعبئة قوائم الفلاتر مرة واحدة (بأول تحميل غير مفلتر) مع الإبقاء على الاختيار
+    if(!_dgFiltersPopulated && (d.allTickers||[]).length){
+      const tSel=document.getElementById('dg-ticker');
+      if(tSel) (d.allTickers||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;tSel.appendChild(o);});
+      const rSel=document.getElementById('dg-reason');
+      if(rSel) (d.allReasons||[]).forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=reasonAr[r]||r;rSel.appendChild(o);});
+      _dgFiltersPopulated=true;
+    }
+
+    if(_dgTrades.length===0){
+      listEl.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--tx3)">لا صفقات مؤرشفة بعد — الأرشيف يبدأ التسجيل من لحظة رفع هذا التحديث، وكل صفقة تُغلق مستقبلاً ستُحفظ هنا للأبد</td></tr>';
+      return;
+    }
+
+    listEl.innerHTML=_dgTrades.map((t,i)=>{
+      const pc=(t.pnl??0)>=0?'var(--green)':'var(--red)';
+      const slip=t.slippage!=null?`<span style="color:${t.slippage>=0?'var(--green)':'var(--orange)'}">${t.slippage>=0?'+':''}${(+t.slippage).toFixed(3)}</span>`:'<span style="color:var(--tx3)">—</span>';
+      const q={strong:'🟢 قوية',normal:'🟡 عادية',weak:'🔴 ضعيفة'}[t.signalQuality]||'—';
+      const opened=t.openedAt?new Date(t.openedAt).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—';
+      const closed=t.recordedAt?new Date(t.recordedAt).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—';
+      return `<tr onclick="dgToggle(${i})" style="cursor:pointer">
+        <td class="pn n" style="white-space:nowrap">${t.date||'—'}</td>
+        <td><span class="tk">${t.ticker}</span></td>
+        <td class="pn n">${t.qty}</td>
+        <td class="pn n" style="white-space:nowrap">$${(+t.entry).toFixed(2)} ← $${(+t.exitPrice).toFixed(2)}</td>
+        <td class="pn" style="color:${pc};font-weight:700">${(t.pnl??0)>=0?'+':''}$${(t.pnl??0).toFixed(2)}</td>
+        <td class="pn">${slip}</td>
+        <td style="font-size:9px">${q}</td>
+        <td style="font-size:8px;color:var(--tx3)">${reasonAr[t.reason]||t.reason||''}</td>
+      </tr>
+      <tr id="dg-det-${i}" style="display:none">
+        <td colspan="8" style="background:var(--s2);padding:10px 14px">
+          <div style="font-size:9px;color:var(--tx2);line-height:1.8">
+            <div>⏱️ فُتحت: ${opened} — أُغلقت: ${closed}</div>
+            ${t.target!=null?`<div>🎯 الهدف: $${t.target} | 🛑 الوقف: $${t.stopLoss}</div>`:''}
+            ${t.signalReason?`<div>📊 الإشارة الأصلية: ${t.signalReason}</div>`:'<div style="color:var(--tx3)">لا تفاصيل إشارة محفوظة لهذه الصفقة</div>'}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }catch(e){
+    listEl.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--red)">⚠️ تعذر جلب الأرشيف — '+e.message+'</td></tr>';
+  }
+}
+
+function dgToggle(i){
+  const el=document.getElementById('dg-det-'+i);
+  if(el) el.style.display=el.style.display==='none'?'table-row':'none';
+}
+
+function dgResetFilters(){
+  ['dg-ticker','dg-reason','dg-from','dg-to'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  loadDiag();
+}
+
+function dgExportCSV(){
+  const p=dgParams(); p.set('format','csv');
+  window.open('/api/trade-archive?'+p.toString(),'_blank');
+}
+
 // ═══ BOT ═══
 let botOpen=false;
 function toggleBot(){
@@ -2836,6 +2982,7 @@ async function loadAutoTrade(){
             else if(dec.type==='close' && dec.position) detail = `${dec.position.ticker} — ${reasonAr[dec.result?.reason]||dec.result?.reason||''} — ${dec.result?.pnl>=0?'+':''}$${(dec.result?.pnl||0).toFixed(0)}`;
             else if(dec.type==='close' && dec.ticker) detail = `${dec.ticker} — ${reasonAr[dec.reason]||dec.reason||''} — ${(dec.pnl||0)>=0?'+':''}$${(dec.pnl||0).toFixed(0)}`;
             else if(dec.type==='orphan_position_detected') detail = `${dec.symbol} × ${dec.qty} — ${dec.action==='liquidate'?'تمت تصفيته فوراً':'إشعار فقط — راجعه يدوياً'}`;
+            else if(dec.type==='error') detail = `${dec.ticker?dec.ticker+' — ':''}${dec.message||dec.reason||'خطأ غير مفصّل'}`;
             else if(dec.type==='skip_summary'){
               const fromT = new Date(dec.from).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
               const toT = new Date(dec.to).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});
