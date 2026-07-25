@@ -140,6 +140,11 @@ export default async function handler(req, res) {
           ticker: pos.ticker, qty: pos.qty, entry: pos.entry,
           exitPrice: result.exitPrice, pnl: result.pnl ?? 0,
           reason: result.reason, slippage: result.slippage ?? null,
+          // ✨ سياق الإشارة الكامل — للأرشيف الدائم وقسم التشخيص
+          openedAt: pos.openedAt || null,
+          signalQuality: pos.signalQuality || null,
+          signalReason: pos.reason || null,
+          target: pos.target ?? null, stopLoss: pos.stopLoss ?? null,
         }).catch(() => {});
         await notifyTradeClosed(pos, result).catch(() => {});
         await setCooldown(pos.ticker).catch(() => {});
@@ -315,6 +320,10 @@ async function syncWithBroker() {
         slippage: closeReason === 'target_filled_synced' ? +(exitPrice - pos.target).toFixed(4)
                 : closeReason === 'stop_loss_filled_synced' ? +(exitPrice - pos.stopLoss).toFixed(4)
                 : null,
+        openedAt: pos.openedAt || null,
+        signalQuality: pos.signalQuality || null,
+        signalReason: pos.reason || null,
+        target: pos.target ?? null, stopLoss: pos.stopLoss ?? null,
       }).catch(() => {});
       await notifyTradeClosed(pos, { closed: true, reason: closeReason, exitPrice, pnl }).catch(() => {});
     }
